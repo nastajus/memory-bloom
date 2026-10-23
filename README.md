@@ -10,7 +10,7 @@ Memory Bloom is a quiet Windows memory-pressure companion. It stays invisible wh
 
 The primary view is deliberately small. Its ring, accent color, status language, and whole-window opacity intensify with memory pressure; hovering makes it fully opaque. It can remain tucked against either side of a monitor, appear only when its configured threshold is crossed, and disappear again after pressure settles.
 
-| Staged comfortable state · normally hidden | High pressure · fully opaque on hover |
+| Comfortable state · normally hidden | High pressure · fully opaque on hover |
 |---|---|
 | ![Memory Bloom at 55 percent with low resting opacity](docs/screenshots/v0.1.0/tier-comfortable-55.png) | ![Memory Bloom at 92 percent and fully opaque](docs/screenshots/v0.8.0/minimal.png) |
 
@@ -52,7 +52,7 @@ Firefox does not expose a supported, authoritative tab-to-Windows-PID mapping. M
 
 Memory Bloom currently targets Windows 11 and the .NET 10 Desktop Runtime.
 
-1. Download [MemoryBloom.exe](docs/releases/v0.9.0/MemoryBloom.exe), or build it locally.
+1. Download [MemoryBloom.exe](docs/releases/v0.10.0/MemoryBloom.exe), or build it locally.
 2. Run it once. Use `Ctrl+Alt+M` or the notification-area icon to bring it into focus.
 3. To install sign-in startup and the desktop shortcut, run:
 
@@ -73,6 +73,7 @@ The build is written to `release\MemoryBloom.exe`. Settings are stored under `%L
 - Click the compact surface or detailed title bar to switch modes.
 - Drag either surface normally; Windows handles edge Snap and maximize behavior.
 - Use `+` / `−` or Ctrl + mouse wheel to scale the compact view.
+- Right-click the compact view and choose **Exit Memory Bloom** to quit.
 - Double-click a process to bring its window forward.
 - Right-click a process for **Bring to front** and **End process…**.
 - Press `Ctrl+Alt+M` or double-click the tray icon to show details.

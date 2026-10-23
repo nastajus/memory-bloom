@@ -1289,12 +1289,50 @@ public partial class MainWindow : Window
             ShowMinimal(manual: true);
             UpdateLayout();
             SaveVisual(System.IO.Path.Combine(folder, "minimal.png"));
+            CaptureCompactMenuPreview(System.IO.Path.Combine(folder, "compact-context-menu.png"));
             CapturePressureTierPreviews(folder);
         }
         finally
         {
             ExitApp();
         }
+    }
+
+    private void CaptureCompactMenuPreview(string path)
+    {
+        var menu = MinimalView.ContextMenu;
+        if (menu is null) return;
+
+        menu.ApplyTemplate();
+        menu.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        menu.Arrange(new Rect(menu.DesiredSize));
+        menu.UpdateLayout();
+
+        var windowWidth = Math.Max(1, (int)Math.Ceiling(ActualWidth));
+        var windowHeight = Math.Max(1, (int)Math.Ceiling(ActualHeight));
+        var menuWidth = Math.Max(1, (int)Math.Ceiling(menu.ActualWidth));
+        var menuHeight = Math.Max(1, (int)Math.Ceiling(menu.ActualHeight));
+        var windowBitmap = new RenderTargetBitmap(windowWidth, windowHeight, 96, 96, PixelFormats.Pbgra32);
+        windowBitmap.Render(this);
+        var menuBitmap = new RenderTargetBitmap(menuWidth, menuHeight, 96, 96, PixelFormats.Pbgra32);
+        menuBitmap.Render(menu);
+
+        const int gap = 6;
+        var outputWidth = Math.Max(windowWidth, menuWidth);
+        var outputHeight = windowHeight + gap + menuHeight;
+        var composition = new DrawingVisual();
+        using (var context = composition.RenderOpen())
+        {
+            context.DrawImage(windowBitmap, new Rect(0, 0, windowWidth, windowHeight));
+            context.DrawImage(menuBitmap, new Rect(outputWidth - menuWidth, windowHeight + gap, menuWidth, menuHeight));
+        }
+
+        var output = new RenderTargetBitmap(outputWidth, outputHeight, 96, 96, PixelFormats.Pbgra32);
+        output.Render(composition);
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(output));
+        using var stream = System.IO.File.Create(path);
+        encoder.Save(stream);
     }
 
     private void CapturePressureTierPreviews(string folder)
@@ -1364,6 +1402,7 @@ public partial class MainWindow : Window
 
     private void ZoomIn_Click(object sender, RoutedEventArgs e) { ChangeScale(0.10); e.Handled = true; }
     private void ZoomOut_Click(object sender, RoutedEventArgs e) { ChangeScale(-0.10); e.Handled = true; }
+    private void Exit_Click(object sender, RoutedEventArgs e) => ExitApp();
     private void ShowMinimal_Click(object sender, RoutedEventArgs e) => ShowMinimal(manual: true);
     private void Hide_Click(object sender, RoutedEventArgs e) => HideUntilPressure();
     private void MainWindow_MouseWheel(object sender, MouseWheelEventArgs e) { if ((Keyboard.Modifiers & ModifierKeys.Control) != 0) ChangeScale(e.Delta > 0 ? 0.10 : -0.10); }

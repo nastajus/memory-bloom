@@ -17,6 +17,11 @@
             PreviewMouseLeftButtonUp="Shell_PreviewMouseLeftButtonUp">
         <Grid>
             <Grid x:Name="MinimalView">
+                <Grid.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem Header="Exit Memory Bloom" Click="Exit_Click"/>
+                    </ContextMenu>
+                </Grid.ContextMenu>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="76"/>
                     <ColumnDefinition Width="*"/>
