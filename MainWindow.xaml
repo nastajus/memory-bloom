@@ -1,0 +1,94 @@
+<Window x:Class="MemoryBloom.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Memory Bloom" WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        ShowInTaskbar="False" ResizeMode="CanResizeWithGrip" Topmost="True"
+        Width="292" Height="116" MinWidth="250" MinHeight="96">
+    <Border x:Name="Shell" Background="{StaticResource Panel}" CornerRadius="22" BorderThickness="1"
+            BorderBrush="#55697B7D" Padding="12"
+            PreviewMouseLeftButtonDown="Shell_PreviewMouseLeftButtonDown"
+            PreviewMouseMove="Shell_PreviewMouseMove"
+            PreviewMouseLeftButtonUp="Shell_PreviewMouseLeftButtonUp">
+        <Grid>
+            <Grid x:Name="MinimalView">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="76"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="28"/>
+                </Grid.ColumnDefinitions>
+                <Grid Width="68" Height="68">
+                    <Ellipse Stroke="#31505B60" StrokeThickness="7"/>
+                    <Path x:Name="PressureArc" Stroke="#FF75D6B2" StrokeThickness="7" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                    <Ellipse x:Name="Pulse" Width="34" Height="34" Fill="#4475D6B2"/>
+                    <TextBlock x:Name="PercentText" Text="--" Foreground="{StaticResource TextPrimary}" FontSize="17"
+                               FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Grid>
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="7,0,4,0">
+                    <TextBlock Text="Memory is getting busy" Foreground="{StaticResource TextPrimary}" FontSize="14" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="SummaryText" Text="Checking pressure…" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,4,0,0"/>
+                    <TextBlock Text="Click for details" Foreground="#FF75D6B2" FontSize="10" Margin="0,4,0,0"/>
+                </StackPanel>
+                <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                    <Button Click="ZoomIn_Click" ToolTip="Make larger" Padding="3,0" FontSize="14">+</Button>
+                    <Button Click="ZoomOut_Click" ToolTip="Make smaller" Padding="3,0" FontSize="14">−</Button>
+                </StackPanel>
+            </Grid>
+
+            <Grid x:Name="DetailedView" Visibility="Collapsed">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="92"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <Grid x:Name="TitleBar" Background="Transparent" ToolTip="Click to switch modes · drag to move">
+                    <StackPanel Orientation="Horizontal">
+                        <Ellipse x:Name="HeaderDot" Width="11" Height="11" Fill="#FF75D6B2" Margin="2,0,9,0"/>
+                        <TextBlock Text="MEMORY BLOOM" Foreground="{StaticResource TextMuted}" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <TextBlock x:Name="LoadingText" Text="Refreshing…" Foreground="{StaticResource TextMuted}" FontSize="10"
+                               Margin="145,0,0,0" VerticalAlignment="Center" Visibility="Collapsed"/>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Click="OpenFirefoxProcesses_Click" ToolTip="Open Firefox's exact tab/process view">Firefox tabs ↗</Button>
+                        <Button Click="ShowMinimal_Click" ToolTip="Return to the small view">Minimal</Button>
+                        <Button Click="Hide_Click" ToolTip="Hide until pressure rises">×</Button>
+                    </StackPanel>
+                </Grid>
+                <Grid Grid.Row="1" Margin="0,8,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="150"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock x:Name="DetailPercent" Text="--%" Foreground="{StaticResource TextPrimary}" FontSize="34" FontWeight="SemiBold"/>
+                        <TextBlock Text="overall pressure" Foreground="{StaticResource TextMuted}" FontSize="11"/>
+                    </StackPanel>
+                    <Grid Grid.Column="1" Margin="12,4,0,0">
+                        <Grid.RowDefinitions><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
+                        <TextBlock x:Name="PhysicalText" Foreground="{StaticResource TextPrimary}" FontSize="13"/>
+                        <TextBlock x:Name="CommitText" Grid.Row="1" Foreground="{StaticResource TextMuted}" FontSize="13"/>
+                    </Grid>
+                </Grid>
+                <Border Grid.Row="2" Background="#66253034" CornerRadius="14" Padding="8">
+                    <TreeView x:Name="ProcessTree" Background="Transparent" BorderThickness="0"
+                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                              SelectedItemChanged="ProcessTree_SelectedItemChanged"
+                              PreviewMouseRightButtonDown="ProcessTree_PreviewMouseRightButtonDown"
+                              MouseDoubleClick="ProcessTree_MouseDoubleClick"/>
+                </Border>
+                <Grid Grid.Row="3" Margin="0,8,0,0">
+                    <StackPanel Orientation="Horizontal">
+                        <Button x:Name="FocusButton" Click="Focus_Click" IsEnabled="False">Bring to front</Button>
+                        <Button x:Name="EndButton" Click="End_Click" IsEnabled="False" Background="#553F2225" BorderBrush="#885E3439">End process…</Button>
+                        <TextBlock x:Name="SelectionText" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="8,0,0,0"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <TextBlock Text="Alert at" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                        <Slider x:Name="ThresholdSlider" Minimum="65" Maximum="95" Width="92" Margin="8,0" ValueChanged="ThresholdSlider_ValueChanged"/>
+                        <TextBlock x:Name="ThresholdText" Foreground="{StaticResource TextPrimary}" Width="34" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Grid>
+            </Grid>
+        </Grid>
+    </Border>
+</Window>
