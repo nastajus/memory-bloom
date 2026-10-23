@@ -56,7 +56,8 @@ public partial class MainWindow : Window
 
     private readonly AppSettings _settings = AppSettings.Load();
     private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromSeconds(2) };
-    private readonly DispatcherTimer _firefoxTimer = new() { Interval = TimeSpan.FromMilliseconds(500) };
+    private readonly DispatcherTimer _firefoxTimer = new() { Interval = TimeSpan.FromMilliseconds(250) };
+    private readonly FirefoxCompanionServer _firefoxCompanion;
     private readonly Forms.NotifyIcon _tray;
     private readonly Dictionary<string, bool> _groupExpansionState = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<int, bool> _processExpansionState = new();
@@ -71,7 +72,10 @@ public partial class MainWindow : Window
     private readonly HashSet<int> _latestFirefoxTabHostPids = new();
     private List<ProcessGroup> _latestGroups = new();
     private FirefoxTabsSnapshot _firefoxSessionTabs = new();
+    private FirefoxTabsSnapshot _firefoxCompanionTabs = new();
     private FirefoxTabsSnapshot _latestFirefoxTabs = new();
+    private string _pendingCompanionTabKey = "";
+    private DateTime _pendingCompanionProbeUntilUtc;
     private string _lastForegroundFirefoxTitle = "";
     private int _firefoxBrowserPid;
     private double _restingOpacity = 0.98;
@@ -100,6 +104,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        _firefoxCompanion = new FirefoxCompanionServer(update => Dispatcher.BeginInvoke(() => ApplyFirefoxCompanionUpdate(update)));
         Opacity = 0;
         ThresholdSlider.Value = _settings.ShowAtPercent;
         ThresholdText.Text = $"{_settings.ShowAtPercent:0}%";
@@ -242,7 +247,7 @@ public partial class MainWindow : Window
             foreach (var process in firefoxTabHosts) _latestFirefoxTabHostPids.Add(process.Pid);
             var foreground = GetForegroundFirefoxTitle();
             ObserveLiveFirefoxTab(foreground.IsForeground, foreground.Title, foreground.Window);
-            var mergedTabs = MergeFirefoxTabs(_firefoxSessionTabs);
+            var mergedTabs = MergeFirefoxTabs(CurrentFirefoxSnapshot());
             UpdateFirefoxAssociations(
                 firefoxTabHosts.Select(process => new ProcessActivity(process.Pid, process.CpuTotalMilliseconds, process.WorkingSetBytes)).ToList(),
                 mergedTabs,
@@ -315,6 +320,9 @@ public partial class MainWindow : Window
             _liveTitleKeyByWindow.Clear();
             _supersededLiveTitleKeys.Clear();
             _lastForegroundFirefoxTitle = "";
+            _firefoxCompanionTabs = new FirefoxTabsSnapshot();
+            _pendingCompanionTabKey = "";
+            _pendingCompanionProbeUntilUtc = default;
         }
         _firefoxBrowserPid = browserPid;
     }
@@ -341,7 +349,7 @@ public partial class MainWindow : Window
         if (!_detailed || _latestFirefoxTabHostPids.Count == 0) return;
         var foreground = GetForegroundFirefoxTitle();
         var liveChanged = ObserveLiveFirefoxTab(foreground.IsForeground, foreground.Title, foreground.Window);
-        var mergedTabs = MergeFirefoxTabs(_firefoxSessionTabs);
+        var mergedTabs = MergeFirefoxTabs(CurrentFirefoxSnapshot());
         var associationChanged = UpdateFirefoxAssociations(
             MemoryProbe.ReadProcessActivity(_latestFirefoxTabHostPids),
             mergedTabs,
@@ -400,6 +408,31 @@ public partial class MainWindow : Window
         return titleChanged;
     }
 
+    private FirefoxTabsSnapshot CurrentFirefoxSnapshot() =>
+        _firefoxCompanionTabs.IsCompanion && DateTime.UtcNow - _firefoxCompanionTabs.SourceTimeUtc < TimeSpan.FromSeconds(25)
+            ? _firefoxCompanionTabs
+            : _firefoxSessionTabs;
+
+    private void ApplyFirefoxCompanionUpdate(FirefoxCompanionUpdate update)
+    {
+        if (_firefoxCompanionTabs.SessionId.Length > 0 && !_firefoxCompanionTabs.SessionId.Equals(update.Snapshot.SessionId, StringComparison.Ordinal))
+        {
+            _tabAssociations.Clear();
+            _tabActivityEvidence.Clear();
+        }
+        _firefoxCompanionTabs = update.Snapshot;
+        if (update.EventTabKey.Length > 0)
+        {
+            _pendingCompanionTabKey = update.EventTabKey;
+            _pendingCompanionProbeUntilUtc = DateTime.UtcNow + TimeSpan.FromSeconds(4);
+        }
+        if (_detailed && !_processRefreshRunning && _latestGroups.Count > 0)
+        {
+            _latestFirefoxTabs = MergeFirefoxTabs(CurrentFirefoxSnapshot());
+            PopulateTree(_latestGroups, _latestFirefoxTabs);
+        }
+    }
+
     private FirefoxTabsSnapshot MergeFirefoxTabs(FirefoxTabsSnapshot snapshot)
     {
         var now = DateTime.UtcNow;
@@ -430,12 +463,25 @@ public partial class MainWindow : Window
             }
         }
 
+        if (!snapshot.IsCompanion)
+        {
+            tabs = tabs
+                .GroupBy(tab => NormalizeTitle(tab.Title), StringComparer.Ordinal)
+                .Select(group => group
+                    .OrderByDescending(tab => tab.IsLiveObservation)
+                    .ThenByDescending(tab => tab.LastAccessedUtc)
+                    .First())
+                .ToList();
+        }
+
         return new FirefoxTabsSnapshot
         {
             Tabs = tabs.OrderByDescending(tab => tab.LastAccessedUtc).ToList(),
             SourcePath = snapshot.SourcePath,
             SourceTimeUtc = snapshot.SourceTimeUtc,
-            Error = snapshot.Error
+            Error = snapshot.Error,
+            IsCompanion = snapshot.IsCompanion,
+            SessionId = snapshot.SessionId
         };
     }
 
@@ -446,10 +492,13 @@ public partial class MainWindow : Window
         string activeTitle)
     {
         var now = DateTime.UtcNow;
-        var activeTab = tabsSnapshot.Tabs.FirstOrDefault(tab => TitlesMatch(tab.Title, activeTitle));
+        var companionProbe = _pendingCompanionTabKey.Length > 0 && now <= _pendingCompanionProbeUntilUtc
+            ? tabsSnapshot.Tabs.FirstOrDefault(tab => TabKey(tab).Equals(_pendingCompanionTabKey, StringComparison.Ordinal))
+            : null;
+        var activeTab = companionProbe ?? tabsSnapshot.Tabs.FirstOrDefault(tab => tab.Active) ?? tabsSnapshot.Tabs.FirstOrDefault(tab => TitlesMatch(tab.Title, activeTitle));
         var renderChanged = false;
 
-        if (firefoxIsForeground && activeTab is not null && content.Count > 0)
+        if ((firefoxIsForeground || companionProbe is not null) && activeTab is not null && content.Count > 0)
         {
             var scored = content.Select(process =>
             {
@@ -564,14 +613,15 @@ public partial class MainWindow : Window
                 foreach (var process in OrderProcessesByMemory(group.Processes.Except(tabHosts))) root.Items.Add(MakeProcessTreeItem(process, true, rowDepth: 1));
                 var tabsByPid = firefoxTabs.Tabs
                     .Select(tab => (Tab: tab, Association: _tabAssociations.GetValueOrDefault(TabKey(tab))))
-                    .Where(item => item.Association is not null && IsAssociationCurrent(item.Association) && tabHosts.Any(process => process.Pid == item.Association.Pid))
+                    .Where(item => item.Association is not null && tabHosts.Any(process => process.Pid == item.Association.Pid))
                     .GroupBy(item => item.Association!.Pid)
                     .ToDictionary(grouped => grouped.Key, grouped => grouped.ToList());
-                var observedLinks = tabsByPid.Sum(item => item.Value.Count);
+                var observedLinks = tabsByPid.Sum(item => item.Value.Count(value => IsAssociationCurrent(value.Association!)));
+                var historicalLinks = tabsByPid.Sum(item => item.Value.Count(value => !IsAssociationCurrent(value.Association!)));
                 var contentSection = new TreeViewItem
                 {
-                    Header = MakeRow("Tab hosts", $"{tabHosts.Count} candidate processes · {observedLinks} observed link{(observedLinks == 1 ? "" : "s")}", FormatBytes(tabHosts.Sum(process => process.PrivateBytes)), true,
-                        "These are Firefox processes capable of hosting site or built-in pages—not a count of open tabs. Firefox keeps a pool of content processes and may leave some without a currently observable tab. Links below are inferred from foreground-title changes and short activity bursts.",
+                    Header = MakeRow("Tab hosts", $"{tabHosts.Count} candidates · {observedLinks} current · {historicalLinks} historical · {(firefoxTabs.IsCompanion ? "companion live" : "recovery")}", FormatBytes(tabHosts.Sum(process => process.PrivateBytes)), true,
+                        "These are Firefox processes capable of hosting site or built-in pages—not a count of open tabs. The optional companion makes the tab catalog authoritative and event-driven, but PID links remain inferred from short process-activity bursts. Historical links stay visible after current evidence expires.",
                         depth: 1),
                     Tag = new FirefoxContentSection("Tab hosts"),
                     IsExpanded = _firefoxContentExpanded
@@ -584,7 +634,7 @@ public partial class MainWindow : Window
                 var unresolved = firefoxTabs.Tabs.Where(tab =>
                 {
                     var association = _tabAssociations.GetValueOrDefault(TabKey(tab));
-                    return association is null || !IsAssociationCurrent(association) || tabHosts.All(process => process.Pid != association.Pid);
+                    return association is null || tabHosts.All(process => process.Pid != association.Pid);
                 }).ToList();
                 contentSection.Items.Add(MakeUnresolvedTabsSection(group, firefoxTabs, unresolved));
                 root.Items.Add(contentSection);
@@ -614,9 +664,12 @@ public partial class MainWindow : Window
         var descriptor = process.Role;
         if (!string.IsNullOrWhiteSpace(process.WindowTitle) && process.Role == process.WindowTitle)
             descriptor = Trim(process.WindowTitle, 42);
-        var tabCount = associatedTabs?.Count ?? 0;
+        var currentTabCount = associatedTabs?.Count(item => item.Association is not null && IsAssociationCurrent(item.Association)) ?? 0;
+        var historicalTabCount = associatedTabs?.Count - currentTabCount ?? 0;
         if (firefox && IsFirefoxTabHost(process))
-            descriptor += tabCount == 0 ? " · no tab observed" : $" · {tabCount} observed tab link{(tabCount == 1 ? "" : "s")}";
+            descriptor += currentTabCount == 0 && historicalTabCount == 0
+                ? " · no tab observed"
+                : $" · {currentTabCount} current{(historicalTabCount > 0 ? $" · {historicalTabCount} historical" : "")}";
         var child = new TreeViewItem
         {
             Header = MakeRow(
@@ -665,13 +718,15 @@ public partial class MainWindow : Window
             tab.Title.Equals(mainTitle, StringComparison.OrdinalIgnoreCase) ||
             tab.Title.Contains(mainTitle, StringComparison.OrdinalIgnoreCase) ||
             mainTitle.Contains(tab.Title, StringComparison.OrdinalIgnoreCase));
-        var freshness = snapshot.Error is not null
+        var freshness = snapshot.IsCompanion
+            ? $"companion live · {snapshot.Tabs.Count} open tab{(snapshot.Tabs.Count == 1 ? "" : "s")}"
+            : snapshot.Error is not null
             ? "live observations only · session snapshot pending"
             : $"snapshot {FormatAge(sourceAge)} old{(activeTitleMatches ? "" : " · active title differs")}";
         var section = new TreeViewItem
         {
             Header = MakeRow("Unresolved tabs", freshness, $"{unresolved.Count}", true,
-                "Tabs that have not yet produced a confident process-activity match, or whose last matched PID has disappeared. They remain unresolved rather than being assigned arbitrarily.",
+                "Tabs that have not yet produced a confident process-activity match, or whose last matched PID has disappeared. With the companion installed this list is the current Firefox tab catalog; without it, it comes from Firefox's delayed recovery snapshot.",
                 depth: 2),
             Tag = new FirefoxTabSection("Unresolved tabs"),
             IsExpanded = _tabsSectionExpanded
@@ -711,14 +766,17 @@ public partial class MainWindow : Window
         var driftRecent = association.DriftDetectedUtc is not null && DateTime.UtcNow - association.DriftDetectedUtc < TimeSpan.FromMinutes(10);
         var ageFraction = Math.Clamp(observationAge.TotalMilliseconds / CurrentAssociationLifetime.TotalMilliseconds, 0, 1);
         var currentConfidence = association.Confidence * (1 - ageFraction * 0.50);
-        var warning = observationAge > TimeSpan.FromMinutes(1) || (!tab.IsLiveObservation && sourceAge > TimeSpan.FromMinutes(2)) || currentConfidence < 0.60 || driftRecent;
-        var status = driftRecent
+        var current = IsAssociationCurrent(association);
+        var warning = !current || observationAge > TimeSpan.FromMinutes(1) || (!tab.IsLiveObservation && sourceAge > TimeSpan.FromMinutes(2)) || currentConfidence < 0.60 || driftRecent;
+        var status = !current
+            ? $"historical PID evidence expired · observed {FormatAge(observationAge)} ago · last used {FormatAge(DateTime.UtcNow - tab.LastAccessedUtc)} ago"
+            : driftRecent
             ? $"moved from PID {association.PreviousPid} · seen {FormatAge(observationAge)} ago"
-            : $"{(tab.IsLiveObservation ? "title seen live · " : "")}current confidence {currentConfidence:P0} · observed {FormatAge(observationAge)} ago · last used {FormatAge(DateTime.UtcNow - tab.LastAccessedUtc)} ago";
+            : $"{(snapshot.IsCompanion ? "companion tab · " : tab.IsLiveObservation ? "title seen live · " : "")}current confidence {currentConfidence:P0} · observed {FormatAge(observationAge)} ago · last used {FormatAge(DateTime.UtcNow - tab.LastAccessedUtc)} ago";
         return new TreeViewItem
         {
             Header = MakeTabRow(tab.Title, status,
-                $"{tab.Title}\n{tab.Url}\nInferred PID: {association.Pid}\nConfidence at observation: {association.Confidence:P0}\nCurrent age-adjusted confidence: {currentConfidence:P0}\nObserved: {association.ObservedUtc.ToLocalTime():g}\nThis placement expires after {CurrentAssociationLifetime.TotalMinutes:0} minutes without fresh evidence.\nFirefox snapshot: {snapshot.SourceTimeUtc.ToLocalTime():g}", warning, depth: 3),
+                $"{tab.Title}\n{tab.Url}\n{(current ? "Inferred PID" : "Historical inferred PID")}: {association.Pid}\nConfidence at observation: {association.Confidence:P0}\n{(current ? $"Current age-adjusted confidence: {currentConfidence:P0}" : "Current placement: expired; retained as history")}\nObserved: {association.ObservedUtc.ToLocalTime():g}\nA link stops being current after {CurrentAssociationLifetime.TotalMinutes:0} minutes without fresh evidence, but remains visible as historical evidence while the process and tab still exist.\nTab source: {(snapshot.IsCompanion ? "Firefox companion" : "Firefox recovery snapshot")}", warning, depth: 3),
             Tag = tab
         };
     }
@@ -767,7 +825,7 @@ public partial class MainWindow : Window
         return grid;
     }
 
-    private static string TabKey(FirefoxTabSnapshot tab) => NormalizeTitle(tab.Title);
+    private static string TabKey(FirefoxTabSnapshot tab) => string.IsNullOrWhiteSpace(tab.StableId) ? NormalizeTitle(tab.Title) : tab.StableId;
     private static string NormalizeTitle(string title)
     {
         var cleaned = CleanFirefoxTitle(title);
@@ -1156,6 +1214,7 @@ public partial class MainWindow : Window
         if (source is not null) UnregisterHotKey(source.Handle, HotkeyId);
         _tray.Visible = false;
         _tray.Dispose();
+        _firefoxCompanion.Dispose();
     }
 
     private void ExitApp()

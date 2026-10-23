@@ -6,7 +6,7 @@
 
 Memory Bloom is a quiet Windows memory-pressure companion. It stays invisible while memory is comfortable, then blooms into a small translucent signal as physical or committed memory becomes important. Click it for a process investigator when you need to understand what is using the machine.
 
-![Memory Bloom detailed view](docs/screenshots/v0.7.0/detailed.png)
+![Memory Bloom detailed view](docs/screenshots/v0.8.0/detailed.png)
 
 ## What it does
 
@@ -24,7 +24,7 @@ Memory Bloom is a quiet Windows memory-pressure companion. It stays invisible wh
 
 The compact view remains intentionally small:
 
-![Memory Bloom compact view](docs/screenshots/v0.7.0/minimal.png)
+![Memory Bloom compact view](docs/screenshots/v0.8.0/minimal.png)
 
 ## Firefox investigation
 
@@ -39,9 +39,17 @@ Firefox does not expose a supported, authoritative tab-to-Windows-PID mapping. M
 - Unmatched titles remain under **Unresolved tabs**. Yellow text marks uncertain, aging, changed, or expired evidence.
 - The **Firefox tabs ↗** button opens Firefox's authoritative `about:processes` page.
 
-![Firefox process hierarchy](docs/screenshots/v0.7.0/firefox-processes.png)
+![Firefox process hierarchy](docs/screenshots/v0.8.0/firefox-processes.png)
 
-![Live and unresolved Firefox titles](docs/screenshots/v0.7.0/firefox-tabs.png)
+![Live and unresolved Firefox titles](docs/screenshots/v0.8.0/firefox-tabs.png)
+
+### Optional Firefox companion
+
+Firefox's delayed recovery snapshot is useful without installing anything, but it cannot consistently reveal background reloads or supply a durable tab identity. The optional companion sends the current local tab catalog and lifecycle events to Memory Bloom through Firefox native messaging. It makes no network requests.
+
+The companion makes tab awareness authoritative—IDs, titles, URLs, last-access time, active/hidden/discarded state—but Firefox does not expose each tab's Windows PID through the Tabs API. Memory Bloom therefore continues to label PID placement as inferred, with confidence, age, historical retention, and explicit unresolved rows.
+
+The source is in [`firefox-extension`](firefox-extension/README.md). The [development XPI](docs/releases/v0.8.0/MemoryBloom.Companion.xpi), [native bridge](docs/releases/v0.8.0/MemoryBloom.NativeHost.exe), and [host installer](docs/releases/v0.8.0/install-firefox-companion-host.ps1) are retained with the v0.8.0 release; persistent Firefox installation requires Mozilla signing.
 
 “Static” is not a Firefox state. It is shorthand for a page that is currently too quiet to create a distinctive CPU or working-set signal. A newly opened blank tab, an idle loaded page, or a suspended/discarded background page can all be quiet. Disuse can make a page quieter, but the page itself does not degrade; Memory Bloom deliberately expires its unrefreshed PID evidence after two minutes because continued high confidence would be misleading. A normal Firefox extension could improve title freshness, stable tab identity, and tab actions, but Firefox's supported extension API still does not reveal the content-process PID.
 
@@ -49,7 +57,7 @@ Firefox does not expose a supported, authoritative tab-to-Windows-PID mapping. M
 
 Memory Bloom currently targets Windows 11 and the .NET 10 Desktop Runtime.
 
-1. Download [MemoryBloom.exe](docs/releases/v0.7.0/MemoryBloom.exe), or build it locally.
+1. Download [MemoryBloom.exe](docs/releases/v0.8.0/MemoryBloom.exe), or build it locally.
 2. Run it once. Use `Ctrl+Alt+M` or the notification-area icon to bring it into focus.
 3. To install sign-in startup and the desktop shortcut, run:
 

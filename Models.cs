@@ -74,7 +74,17 @@ internal sealed class ProcessGroup
     public bool IsSystemEstimate { get; init; }
 }
 
-internal sealed record FirefoxTabSnapshot(string Title, string Url, DateTime LastAccessedUtc, bool Hidden, bool IsLiveObservation = false);
+internal sealed record FirefoxTabSnapshot(
+    string Title,
+    string Url,
+    DateTime LastAccessedUtc,
+    bool Hidden,
+    bool IsLiveObservation = false,
+    string StableId = "",
+    int WindowId = 0,
+    bool Active = false,
+    bool Discarded = false,
+    string Source = "recovery");
 
 internal sealed record ProcessActivity(int Pid, double CpuTotalMilliseconds, long WorkingSetBytes);
 
@@ -84,6 +94,8 @@ internal sealed class FirefoxTabsSnapshot
     public DateTime SourceTimeUtc { get; init; }
     public string SourcePath { get; init; } = "";
     public string? Error { get; init; }
+    public bool IsCompanion { get; init; }
+    public string SessionId { get; init; } = "";
 }
 
 internal sealed record FirefoxTabSection(string Name);

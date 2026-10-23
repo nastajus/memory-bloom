@@ -5,6 +5,7 @@ release-*/
 publish/
 previews/
 verified-previews/
+verify-*/
 *.user
 *.suo
 

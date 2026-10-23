@@ -2,6 +2,23 @@
 
 Dates are reconstructed from the conversation and build artifacts where available. Early version boundaries are approximate because Git tracking was requested after development had already begun.
 
+## 0.8.0 — 2026-10-23 15:10 America/Toronto
+
+- Added the optional **Memory Bloom Companion** Firefox extension, a local native-messaging bridge, and a Windows host installer. The companion supplies stable tab IDs plus the current title, URL, window, last-access time, active/hidden/discarded state, and event timing without making network requests.
+- Used Firefox activation, loading/reload, title, URL, move, create, close, replace, discard, and window-focus events to trigger prompt tab-catalog updates and a four-second PID-correlation window—even for a background reload.
+- Preserved the honest boundary: Firefox's Tabs API does not expose OS content-process PIDs, so tab identity is authoritative with the companion while PID ownership remains confidence-scored inference.
+- Increased the detailed Firefox sampler from 500 ms to 250 ms to reduce missed short process bursts.
+- Retained expired tab/PID links under their last live process as explicitly yellow **historical** evidence instead of making them disappear into Unresolved after two minutes.
+- Kept the two-minute current-evidence horizon so a stale placement cannot masquerade as current; historical rows remain while both the open tab and candidate PID exist.
+- Deduplicated recovery/live rows with the same normalized title when no stable extension tab ID is available, fixing the duplicate 41% row shown in the supplied report. The companion preserves genuinely separate same-title tabs because their IDs differ.
+- Changed the Tab hosts summary to distinguish current links, historical links, and whether its tab catalog is from the live companion or Firefox's delayed recovery file.
+
+The first supplied screenshot is the Firefox tab dropdown ground truth. The second shows Bloom seeing only two duplicate links among thirteen candidates after the user refreshed many tabs. Together they document why recovery-file titles and foreground-window sampling alone cannot provide consistent awareness.
+
+![Reported Firefox open-tab ground truth before 0.8.0](docs/screenshots/v0.8.0/reported-firefox-open-tabs.png)
+
+![Reported missed and duplicated links before 0.8.0](docs/screenshots/v0.8.0/reported-missed-and-duplicate-links.png)
+
 ## 0.7.0 — 2026-10-23 14:00 America/Toronto
 
 - Added a passive `--show-passive` startup path and `tools/restart-app.ps1`, which can deploy a replacement executable without taking lasting focus or leaving Memory Bloom flashing in the taskbar.
