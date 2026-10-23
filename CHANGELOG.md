@@ -2,6 +2,24 @@
 
 Dates are reconstructed from the conversation and build artifacts where available. Early version boundaries are approximate because Git tracking was requested after development had already begun.
 
+## 0.6.0 — 2026-10-23 13:38 America/Toronto
+
+- Reworded Firefox `tab` processes as pooled candidate hosts; they no longer imply that each PID contains one or more live tabs.
+- Displayed observed tab-link counts separately and changed empty candidates to **No tab observed**, covering spare, pooled, and indistinguishably quiet processes without guessing.
+- Guarded the sampler's zero-evidence path so a completely quiet foreground page remains unresolved without faulting the refresh loop.
+- Included Firefox built-in-page processes in the activity sampler so New Tab/settings pages are no longer excluded by role.
+- Cleared accumulated title/PID evidence when Firefox's browser PID changes and ignored recovery snapshots that genuinely predate the current browser session.
+- Normalized a bare Firefox window title to **New Tab** for live observation.
+- Made the whole window fully opaque while hovered, restoring its pressure-based resting opacity when the pointer leaves.
+- Expanded and wrapped dark tooltips so long memory and Firefox explanations remain fully readable.
+- Applied a native rounded window region so transparent desktop shows through the four corners while retaining native resizing and Snap.
+- Added a preview-only single-instance exception so visual regression captures can run beside the installed monitor.
+- Backfilled one linked visual archive covering every retained historical screenshot.
+
+The following user-supplied screenshot is preserved as diagnostic context: it shows the 0.5.0 state shortly after a Firefox restart, where five pooled content processes were misleadingly described as holding tabs while no title links had been inferred.
+
+![Reported Firefox restart state before 0.6.0](docs/screenshots/v0.6.0/reported-before-firefox-restart.png)
+
 ## 0.5.0 — 2026-10-23 10:44 America/Toronto
 
 - Replaced coordinate-based dragging with Windows' native non-client move loop and restored standard edge Snap/maximize previews.

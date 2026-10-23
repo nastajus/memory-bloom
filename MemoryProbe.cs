@@ -225,7 +225,8 @@ internal static class MemoryProbe
                         CommandLine = extra.Command ?? "",
                         WindowTitle = process.MainWindowTitle,
                         Role = RoleFor(name, extra.Command ?? "", process.MainWindowTitle),
-                        CpuTotalMilliseconds = process.TotalProcessorTime.TotalMilliseconds
+                        CpuTotalMilliseconds = process.TotalProcessorTime.TotalMilliseconds,
+                        StartTimeUtc = process.StartTime.ToUniversalTime()
                     });
                 }
                 catch { }
@@ -268,6 +269,7 @@ internal static class MemoryProbe
         if (!command.Contains("-contentproc", StringComparison.OrdinalIgnoreCase))
         {
             var activeTitle = Regex.Replace(title ?? "", @"\s*[—-]\s*Mozilla Firefox\s*$", "", RegexOptions.IgnoreCase).Trim();
+            if (activeTitle.Equals("Mozilla Firefox", StringComparison.OrdinalIgnoreCase)) activeTitle = "New Tab";
             return string.IsNullOrWhiteSpace(activeTitle) ? "main browser · windows and UI" : $"main browser · active: {activeTitle}";
         }
         var role = Regex.Match(command, @"-\s+\d+\s+(?<role>tab|gpu|socket|rdd|utility|privilegedabout|extension)", RegexOptions.IgnoreCase);
@@ -275,7 +277,7 @@ internal static class MemoryProbe
         {
             return role.Groups["role"].Value.ToLowerInvariant() switch
             {
-                "tab" => "web content · one or more tabs",
+                "tab" => "web content · pooled site process",
                 "gpu" => "graphics · compositing and WebGL",
                 "socket" => "networking · sockets and connections",
                 "rdd" => "media · sandboxed audio/video decoding",
@@ -285,7 +287,7 @@ internal static class MemoryProbe
                 var value => value
             };
         }
-        if (command.Contains("-isForBrowser", StringComparison.OrdinalIgnoreCase)) return "web content · one or more tabs";
+        if (command.Contains("-isForBrowser", StringComparison.OrdinalIgnoreCase)) return "web content · pooled site process";
         if (command.Contains("sandboxingKind", StringComparison.OrdinalIgnoreCase)) return "sandboxed utility service";
         return "content process";
     }

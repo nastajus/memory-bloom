@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="Memory Bloom" Icon="Assets/MemoryBloom.ico"
-        WindowStyle="None" AllowsTransparency="False" Background="#FF1A2225"
+        WindowStyle="None" AllowsTransparency="False" Background="Transparent"
         ShowInTaskbar="True" ResizeMode="CanResize" Topmost="True"
         Width="292" Height="116" MinWidth="250" MinHeight="96">
     <shell:WindowChrome.WindowChrome>

@@ -62,6 +62,7 @@ internal sealed class ProcessSnapshot
     public string Tooltip { get; init; } = "";
     public bool IsSynthetic { get; init; }
     public double CpuTotalMilliseconds { get; init; }
+    public DateTime StartTimeUtc { get; init; }
 }
 
 internal sealed class ProcessGroup

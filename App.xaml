@@ -36,7 +36,17 @@
             <Setter Property="BorderBrush" Value="#FF53656A"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="9,6"/>
-            <Setter Property="MaxWidth" Value="430"/>
+            <Setter Property="MaxWidth" Value="680"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToolTip">
+                        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="8" Padding="{TemplateBinding Padding}">
+                            <TextBlock Text="{TemplateBinding Content}" TextWrapping="Wrap" MaxWidth="640"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
         <Style TargetType="ContextMenu">
             <Setter Property="Foreground" Value="#FFF0F4F5"/>
