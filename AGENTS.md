@@ -21,3 +21,5 @@ Keep the documentation audiences separate:
 When restarting the installed app during development, use `tools/restart-app.ps1 -Show` rather than launching `MemoryBloom.exe --show` directly. The helper starts the window passively and restores the previously focused window so validation does not leave a flashing taskbar button or interrupt the user's active work.
 
 Firefox tab-to-process relationships are inferred rather than authoritative. Never fabricate a mapping: show unresolved tabs explicitly, retain confidence and observation age, and visually warn when a mapping is stale, uncertain, or has drifted.
+
+Every top-level app mode or page must expose the shared dark **Exit Memory Bloom** context action from its primary/title surface.

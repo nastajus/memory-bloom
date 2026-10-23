@@ -45,14 +45,21 @@ Firefox does not expose a supported, authoritative tab-to-Windows-PID mapping. M
 - A current PID association lasts at most two minutes without fresh evidence. Its displayed confidence decays during that window; after expiry the title remains visibly attached as yellow historical evidence rather than being presented as current.
 - Live titles are tracked per Firefox window. This prevents one ChatGPT tab from becoming several synthetic tabs as its document title changes, while the next recovery snapshot distinguishes navigation from a true tab switch.
 - Unmatched titles remain under **Unresolved tabs**. Yellow text marks uncertain, aging, changed, or expired evidence.
-- The optional local companion supplies stable tab IDs, titles, URLs, last-access times, and tab lifecycle events. Firefox still does not expose each tab's Windows PID, so process placement remains measured inference.
+- The optional local companion supplies stable tab IDs, titles, URLs, last-access times, and tab lifecycle events. It passes that metadata only to Memory Bloom's local native host; Firefox still does not expose each tab's Windows PID, so process placement remains measured inference.
 - The **Firefox tabs ↗** button opens Firefox's authoritative `about:processes` page.
+
+### Installing the Firefox companion
+
+The companion is necessary for a prompt, complete catalog of open tabs. Without it, Memory Bloom falls back to Firefox's delayed recovery snapshot and the foreground window title; background tabs can therefore arrive minutes late or remain unknown. Install the local native host once with `install-firefox-companion-host.ps1`, then choose one extension path:
+
+- **Temporary testing:** after every Firefox restart, open `about:debugging`, choose **This Firefox → Load Temporary Add-on**, and select [`firefox-extension/manifest.json`](firefox-extension/manifest.json). It remains loaded only for that browser session. Mozilla documents the same steps in [Temporary installation in Firefox](https://extensionworkshop.com/documentation/develop/temporary-installation-in-firefox/).
+- **Persistent installation:** use a Mozilla-signed package. The recommended first release is **self-distributed/unlisted**: it stays out of AMO search while installing normally from a signed `.xpi`. Mozilla says automated signing can take up to 24 hours and longer when a submission receives manual review. See the companion's [submission and effort guide](firefox-extension/README.md) and Mozilla's [signing overview](https://extensionworkshop.com/documentation/publish/signing-and-distribution-overview/).
 
 ## Install and run
 
 Memory Bloom currently targets Windows 11 and the .NET 10 Desktop Runtime.
 
-1. Download [MemoryBloom.exe](docs/releases/v0.10.0/MemoryBloom.exe), or build it locally.
+1. Download [MemoryBloom.exe](docs/releases/v0.11.0/MemoryBloom.exe), or build it locally.
 2. Run it once. Use `Ctrl+Alt+M` or the notification-area icon to bring it into focus.
 3. To install sign-in startup and the desktop shortcut, run:
 
@@ -73,7 +80,7 @@ The build is written to `release\MemoryBloom.exe`. Settings are stored under `%L
 - Click the compact surface or detailed title bar to switch modes.
 - Drag either surface normally; Windows handles edge Snap and maximize behavior.
 - Use `+` / `−` or Ctrl + mouse wheel to scale the compact view.
-- Right-click the compact view and choose **Exit Memory Bloom** to quit.
+- Right-click either the compact view or the detailed title bar and choose **Exit Memory Bloom** to quit.
 - Double-click a process to bring its window forward.
 - Right-click a process for **Bring to front** and **End process…**.
 - Press `Ctrl+Alt+M` or double-click the tray icon to show details.

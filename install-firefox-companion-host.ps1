@@ -1,6 +1,8 @@
 $ErrorActionPreference = 'Stop'
-$source = Join-Path $PSScriptRoot 'release\MemoryBloom.NativeHost.exe'
-if (-not (Test-Path -LiteralPath $source)) { throw "Build Memory Bloom first; native host not found at $source" }
+$adjacentSource = Join-Path $PSScriptRoot 'MemoryBloom.NativeHost.exe'
+$builtSource = Join-Path $PSScriptRoot 'release\MemoryBloom.NativeHost.exe'
+$source = if (Test-Path -LiteralPath $adjacentSource) { $adjacentSource } else { $builtSource }
+if (-not (Test-Path -LiteralPath $source)) { throw "Native host not found beside this installer or at $builtSource" }
 
 $install = Join-Path $env:LOCALAPPDATA 'MemoryBloom\FirefoxCompanion'
 New-Item -ItemType Directory -Force -Path $install | Out-Null

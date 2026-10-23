@@ -10,18 +10,18 @@
         <shell:WindowChrome CaptionHeight="0" ResizeBorderThickness="7" GlassFrameThickness="0"
                             CornerRadius="0" UseAeroCaptionButtons="False"/>
     </shell:WindowChrome.WindowChrome>
+    <Window.Resources>
+        <ContextMenu x:Key="SurfaceContextMenu" x:Shared="False">
+            <MenuItem Header="Exit Memory Bloom" Click="Exit_Click"/>
+        </ContextMenu>
+    </Window.Resources>
     <Border x:Name="Shell" Background="{StaticResource Panel}" CornerRadius="22" BorderThickness="1"
             BorderBrush="#55697B7D" Padding="12"
             PreviewMouseLeftButtonDown="Shell_PreviewMouseLeftButtonDown"
             PreviewMouseMove="Shell_PreviewMouseMove"
             PreviewMouseLeftButtonUp="Shell_PreviewMouseLeftButtonUp">
         <Grid>
-            <Grid x:Name="MinimalView">
-                <Grid.ContextMenu>
-                    <ContextMenu>
-                        <MenuItem Header="Exit Memory Bloom" Click="Exit_Click"/>
-                    </ContextMenu>
-                </Grid.ContextMenu>
+            <Grid x:Name="MinimalView" ContextMenu="{StaticResource SurfaceContextMenu}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="76"/>
                     <ColumnDefinition Width="*"/>
@@ -52,7 +52,8 @@
                     <RowDefinition Height="*"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
-                <Grid x:Name="TitleBar" Background="Transparent" ToolTip="Click to switch modes · drag to move">
+                <Grid x:Name="TitleBar" Background="Transparent" ToolTip="Click to switch modes · drag to move"
+                      ContextMenu="{StaticResource SurfaceContextMenu}">
                     <StackPanel Orientation="Horizontal">
                         <Ellipse x:Name="HeaderDot" Width="11" Height="11" Fill="#FF75D6B2" Margin="2,0,9,0"/>
                         <TextBlock Text="MEMORY BLOOM" Foreground="{StaticResource TextMuted}" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center"/>

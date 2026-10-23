@@ -272,7 +272,7 @@ public partial class MainWindow : Window
             if (_reading is not null)
             {
                 groups.Add(BuildSystemMemoryGroup(rows, _reading));
-                groups = groups.OrderByDescending(group => group.TotalPrivateBytes).ToList();
+                groups = OrderGroupsByMemory(groups).ToList();
             }
             _latestGroups = groups;
             _latestFirefoxTabs = mergedTabs;
@@ -600,7 +600,7 @@ public partial class MainWindow : Window
         }
 
         ProcessTree.Items.Clear();
-        foreach (var group in groups)
+        foreach (var group in OrderGroupsByMemory(groups))
         {
             var root = new TreeViewItem
             {
@@ -664,6 +664,9 @@ public partial class MainWindow : Window
 
     private static IOrderedEnumerable<ProcessSnapshot> OrderProcessesByMemory(IEnumerable<ProcessSnapshot> processes) =>
         processes.OrderByDescending(process => process.PrivateBytes).ThenBy(process => process.Pid);
+
+    private static IOrderedEnumerable<ProcessGroup> OrderGroupsByMemory(IEnumerable<ProcessGroup> groups) =>
+        groups.OrderByDescending(group => group.TotalPrivateBytes).ThenBy(group => group.Name, StringComparer.OrdinalIgnoreCase);
 
     private static bool IsAssociationCurrent(TabProcessAssociation association) =>
         DateTime.UtcNow - association.ObservedUtc <= CurrentAssociationLifetime;
@@ -1277,6 +1280,7 @@ public partial class MainWindow : Window
             firefoxRoot?.BringIntoView();
             UpdateLayout();
             SaveVisual(System.IO.Path.Combine(folder, "detailed.png"));
+            CaptureSurfaceMenuPreview(TitleBar, System.IO.Path.Combine(folder, "detailed-titlebar-context-menu.png"), overlayOnWindow: true);
 
             (previewProcess?.Items.OfType<TreeViewItem>().FirstOrDefault() ?? previewProcess)?.BringIntoView();
             UpdateLayout();
@@ -1289,7 +1293,7 @@ public partial class MainWindow : Window
             ShowMinimal(manual: true);
             UpdateLayout();
             SaveVisual(System.IO.Path.Combine(folder, "minimal.png"));
-            CaptureCompactMenuPreview(System.IO.Path.Combine(folder, "compact-context-menu.png"));
+            CaptureSurfaceMenuPreview(MinimalView, System.IO.Path.Combine(folder, "compact-context-menu.png"), overlayOnWindow: false);
             CapturePressureTierPreviews(folder);
         }
         finally
@@ -1298,9 +1302,9 @@ public partial class MainWindow : Window
         }
     }
 
-    private void CaptureCompactMenuPreview(string path)
+    private void CaptureSurfaceMenuPreview(FrameworkElement surface, string path, bool overlayOnWindow)
     {
-        var menu = MinimalView.ContextMenu;
+        var menu = surface.ContextMenu;
         if (menu is null) return;
 
         menu.ApplyTemplate();
@@ -1319,12 +1323,15 @@ public partial class MainWindow : Window
 
         const int gap = 6;
         var outputWidth = Math.Max(windowWidth, menuWidth);
-        var outputHeight = windowHeight + gap + menuHeight;
+        var outputHeight = overlayOnWindow ? windowHeight : windowHeight + gap + menuHeight;
+        var menuLeft = outputWidth - menuWidth - (overlayOnWindow ? 12 : 0);
+        var surfaceBottom = surface.TranslatePoint(new Point(0, surface.ActualHeight), this).Y;
+        var menuTop = overlayOnWindow ? Math.Min(windowHeight - menuHeight - 12, surfaceBottom + gap) : windowHeight + gap;
         var composition = new DrawingVisual();
         using (var context = composition.RenderOpen())
         {
             context.DrawImage(windowBitmap, new Rect(0, 0, windowWidth, windowHeight));
-            context.DrawImage(menuBitmap, new Rect(outputWidth - menuWidth, windowHeight + gap, menuWidth, menuHeight));
+            context.DrawImage(menuBitmap, new Rect(menuLeft, menuTop, menuWidth, menuHeight));
         }
 
         var output = new RenderTargetBitmap(outputWidth, outputHeight, 96, 96, PixelFormats.Pbgra32);

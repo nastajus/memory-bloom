@@ -4,6 +4,12 @@ Concise user-visible release notes. The engineering audit is kept separately in 
 
 Dates for early releases are reconstructed from the conversation and build artifacts because Git tracking began after initial development.
 
+## 0.11.0 — 2026-10-23
+
+- Added the shared dark **Exit Memory Bloom** menu to the detailed title bar as well as compact mode.
+- Made **Windows, cache & shared** re-sort dynamically among root application groups by its current aggregate memory estimate.
+- Documented temporary Firefox companion loading, unlisted Mozilla signing, expected effort, and review-delay tradeoffs.
+
 ## 0.10.0 — 2026-10-23
 
 - Added a dark right-click menu to the compact view with **Exit Memory Bloom**.
