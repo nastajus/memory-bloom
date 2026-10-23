@@ -1,6 +1,21 @@
-# Memory Bloom progress record
+# Memory Bloom engineering history
 
-This is the human-readable design trail. Every feature or design prompt should add a dated iteration, save new screenshots under `docs/screenshots/<version>/`, update **Current state** and **Next state**, and end with a Git commit.
+This is the exhaustive engineering audit trail: every iteration, reported bug, implementation challenge, design decision, known limitation, release artifact, and retained screenshot. The public-facing project overview intentionally lives in [`README.md`](../README.md) and stays concise.
+
+Each checkpoint has a detailed record under [`docs/history/`](history/). Screenshots remain centralized under [`docs/screenshots/<version>/`](screenshots/) rather than being copied beside every history file; this gives each image one canonical path while allowing both the audit and version notes to link it.
+
+## Version records
+
+| Checkpoint | Focus | Detailed audit |
+|---|---|---|
+| 0.1.0 | Initial conditional pressure companion | [v0.1.0](history/v0.1.0.md) |
+| 0.2.0 | Click/drag/process interaction and stable trees | [v0.2.0](history/v0.2.0.md) |
+| 0.3.0 | Firefox metadata and system-memory accounting | [v0.3.0](history/v0.3.0.md) |
+| 0.4.0 | Per-process Firefox inference and visual audit workflow | [v0.4.0](history/v0.4.0.md) |
+| 0.5.0 | Native Windows behavior, branding, and faster evidence | [v0.5.0](history/v0.5.0.md) |
+| 0.6.0 | Honest Firefox host language and visual polish | [v0.6.0](history/v0.6.0.md) |
+| 0.7.0 | Edge-aware expansion and expiring evidence | [v0.7.0](history/v0.7.0.md) |
+| 0.8.0 | Firefox companion and durable historical evidence | [v0.8.0](history/v0.8.0.md) |
 
 ## Current state — 0.8.0
 
@@ -26,10 +41,10 @@ This is the human-readable design trail. Every feature or design prompt should a
 
 Screenshots:
 
-- [Overall accounting 0.8.0](docs/screenshots/v0.8.0/detailed.png)
-- [Firefox host status 0.8.0](docs/screenshots/v0.8.0/firefox-processes.png)
-- [Unresolved catalog 0.8.0](docs/screenshots/v0.8.0/firefox-tabs.png)
-- [Compact 0.8.0](docs/screenshots/v0.8.0/minimal.png)
+- [Overall accounting 0.8.0](screenshots/v0.8.0/detailed.png)
+- [Firefox host status 0.8.0](screenshots/v0.8.0/firefox-processes.png)
+- [Unresolved catalog 0.8.0](screenshots/v0.8.0/firefox-tabs.png)
+- [Compact 0.8.0](screenshots/v0.8.0/minimal.png)
 
 ## Next state — 0.9.0
 
@@ -46,11 +61,11 @@ Last state: Firefox's recovery file could lag several minutes, foreground-title 
 
 Reported ground truth: the Firefox dropdown showed Gmail, Calendar, several ChatGPT tabs, ActivityWatch, and New Tab open at once.
 
-![Reported Firefox open tabs before 0.8.0](docs/screenshots/v0.8.0/reported-firefox-open-tabs.png)
+![Reported Firefox open tabs before 0.8.0](screenshots/v0.8.0/reported-firefox-open-tabs.png)
 
 Reported Bloom result: only two duplicate links were observed under one PID while eleven other candidate processes showed no tab. This is the expected failure mode of polling the delayed recovery file and correlating only a foreground window title; refreshing a background tab does not put its title in the native top-level window caption.
 
-![Reported missed and duplicated links before 0.8.0](docs/screenshots/v0.8.0/reported-missed-and-duplicate-links.png)
+![Reported missed and duplicated links before 0.8.0](screenshots/v0.8.0/reported-missed-and-duplicate-links.png)
 
 Result: expired PID claims remain visible but unmistakably historical; current and historical counts are separate; fallback snapshot echoes are deduplicated; sampling runs every 250 ms; and the optional companion/native host now provides the full live catalog and event timing needed to know every open tab promptly. The extension provides tab identity, not an OS PID, so Bloom still infers the final mapping from measured process activity.
 
@@ -62,11 +77,11 @@ Last state: reopening a development build could steal focus and leave its taskba
 
 Reported corner context: this user-supplied crop shows the narrow outer native curve competing with the broader inner panel curve. The broader 22-DIP panel curve is now the sole geometry and is converted to physical pixels for the active monitor DPI.
 
-![Reported double-corner geometry before 0.7.0](docs/screenshots/v0.7.0/reported-before-double-corners.png)
+![Reported double-corner geometry before 0.7.0](screenshots/v0.7.0/reported-before-double-corners.png)
 
 Reported Firefox context: this user-supplied view shows one ChatGPT tab's changing document titles accumulated as seven links under one PID, plus six-minute-old observations retaining 94–96% labels. It motivated per-window title replacement, ChatGPT suffix normalization, confidence aging, and a two-minute placement expiry.
 
-![Reported stale and duplicated Firefox links before 0.7.0](docs/screenshots/v0.7.0/reported-before-stale-tab-links.png)
+![Reported stale and duplicated Firefox links before 0.7.0](screenshots/v0.7.0/reported-before-stale-tab-links.png)
 
 Result: the compact view records which half of its current monitor it occupies and detailed mode grows inward while preserving the near edge; collapsing restores the compact position. App child PIDs sort by memory. Firefox live titles are tracked per window, same-page transitions suppress superseded titles until the next recovery snapshot distinguishes navigation from a tab switch, and unrefreshed PID evidence moves to **Unresolved tabs** after two minutes. Project restarts can deploy and show passively while restoring the previously focused window.
 
@@ -78,7 +93,7 @@ Last state: Firefox's pooled `tab` processes were described as “one or more ta
 
 Reported context: this user-supplied 0.5.0 screenshot was taken after Firefox had been restarted with a much smaller live session. It records the misleading five-process/zero-match wording and the lingering unresolved snapshot that motivated this pass; it is diagnostic evidence, not a release beauty shot.
 
-![Reported Firefox restart state before 0.6.0](docs/screenshots/v0.6.0/reported-before-firefox-restart.png)
+![Reported Firefox restart state before 0.6.0](screenshots/v0.6.0/reported-before-firefox-restart.png)
 
 Result: candidate Firefox tab-host processes are now explicitly separated from observed tab links, built-in Firefox pages can be sampled, restart/session timestamps discard genuinely pre-restart data, and idle/spare candidates say “no tab observed” instead of claiming ownership. Hover raises the window to full opacity, wrapped tooltips show their full text, and a native rounded region removes the square outer corners without giving up normal Windows Snap.
 
@@ -124,20 +139,20 @@ Result: Memory Bloom introduced threshold-driven visibility, intensity graphics/
 
 Screenshots:
 
-- [Detailed 0.1.0](docs/screenshots/v0.1.0/detailed.png)
-- [Minimal 0.1.0](docs/screenshots/v0.1.0/minimal.png)
+- [Detailed 0.1.0](screenshots/v0.1.0/detailed.png)
+- [Minimal 0.1.0](screenshots/v0.1.0/minimal.png)
 
 Next state: improve direct manipulation and Firefox process descriptions.
 
 ## Visual archive
 
-Every generated checkpoint below is retained and linked here. Version 0.2.0 predates the automated capture workflow and has a [reconstructed functional record](docs/history/v0.2.0.md) rather than screenshots.
+Every generated checkpoint below is retained and linked here. Version 0.2.0 predates the automated capture workflow and has a [reconstructed functional record](history/v0.2.0.md) rather than screenshots.
 
-- 0.1.0: [detailed](docs/screenshots/v0.1.0/detailed.png), [minimal](docs/screenshots/v0.1.0/minimal.png)
-- 0.3.0: [detailed](docs/screenshots/v0.3.0/detailed.png), [minimal](docs/screenshots/v0.3.0/minimal.png)
-- 0.4.0: [detailed](docs/screenshots/v0.4.0/detailed.png), [Firefox processes](docs/screenshots/v0.4.0/firefox-processes.png), [Firefox tabs](docs/screenshots/v0.4.0/firefox-tabs.png), [minimal](docs/screenshots/v0.4.0/minimal.png)
-- 0.5.0: [detailed](docs/screenshots/v0.5.0/detailed.png), [Firefox processes](docs/screenshots/v0.5.0/firefox-processes.png), [Firefox tabs](docs/screenshots/v0.5.0/firefox-tabs.png), [minimal](docs/screenshots/v0.5.0/minimal.png), [icon](docs/screenshots/v0.5.0/icon.png)
-- 0.6.0: [reported context](docs/screenshots/v0.6.0/reported-before-firefox-restart.png), [detailed](docs/screenshots/v0.6.0/detailed.png), [Firefox candidate hosts](docs/screenshots/v0.6.0/firefox-processes.png), [Firefox tabs](docs/screenshots/v0.6.0/firefox-tabs.png), [minimal](docs/screenshots/v0.6.0/minimal.png)
-- 0.7.0: [reported corner context](docs/screenshots/v0.7.0/reported-before-double-corners.png), [reported Firefox context](docs/screenshots/v0.7.0/reported-before-stale-tab-links.png), [detailed](docs/screenshots/v0.7.0/detailed.png), [memory-sorted Firefox hosts](docs/screenshots/v0.7.0/firefox-processes.png), [Firefox tabs](docs/screenshots/v0.7.0/firefox-tabs.png), [compact](docs/screenshots/v0.7.0/minimal.png)
-- 0.8.0: [reported Firefox ground truth](docs/screenshots/v0.8.0/reported-firefox-open-tabs.png), [reported missed links](docs/screenshots/v0.8.0/reported-missed-and-duplicate-links.png), [detailed](docs/screenshots/v0.8.0/detailed.png), [Firefox hosts](docs/screenshots/v0.8.0/firefox-processes.png), [unresolved catalog](docs/screenshots/v0.8.0/firefox-tabs.png), [compact](docs/screenshots/v0.8.0/minimal.png)
+- 0.1.0: [detailed](screenshots/v0.1.0/detailed.png), [minimal](screenshots/v0.1.0/minimal.png)
+- 0.3.0: [detailed](screenshots/v0.3.0/detailed.png), [minimal](screenshots/v0.3.0/minimal.png)
+- 0.4.0: [detailed](screenshots/v0.4.0/detailed.png), [Firefox processes](screenshots/v0.4.0/firefox-processes.png), [Firefox tabs](screenshots/v0.4.0/firefox-tabs.png), [minimal](screenshots/v0.4.0/minimal.png)
+- 0.5.0: [detailed](screenshots/v0.5.0/detailed.png), [Firefox processes](screenshots/v0.5.0/firefox-processes.png), [Firefox tabs](screenshots/v0.5.0/firefox-tabs.png), [minimal](screenshots/v0.5.0/minimal.png), [icon](screenshots/v0.5.0/icon.png)
+- 0.6.0: [reported context](screenshots/v0.6.0/reported-before-firefox-restart.png), [detailed](screenshots/v0.6.0/detailed.png), [Firefox candidate hosts](screenshots/v0.6.0/firefox-processes.png), [Firefox tabs](screenshots/v0.6.0/firefox-tabs.png), [minimal](screenshots/v0.6.0/minimal.png)
+- 0.7.0: [reported corner context](screenshots/v0.7.0/reported-before-double-corners.png), [reported Firefox context](screenshots/v0.7.0/reported-before-stale-tab-links.png), [detailed](screenshots/v0.7.0/detailed.png), [memory-sorted Firefox hosts](screenshots/v0.7.0/firefox-processes.png), [Firefox tabs](screenshots/v0.7.0/firefox-tabs.png), [compact](screenshots/v0.7.0/minimal.png)
+- 0.8.0: [reported Firefox ground truth](screenshots/v0.8.0/reported-firefox-open-tabs.png), [reported missed links](screenshots/v0.8.0/reported-missed-and-duplicate-links.png), [detailed](screenshots/v0.8.0/detailed.png), [Firefox hosts](screenshots/v0.8.0/firefox-processes.png), [unresolved catalog](screenshots/v0.8.0/firefox-tabs.png), [compact](screenshots/v0.8.0/minimal.png)
 

@@ -2,7 +2,15 @@
 
 Dates are reconstructed from the conversation and build artifacts where available. Early version boundaries are approximate because Git tracking was requested after development had already begun.
 
-## 0.8.0 — 2026-10-23 15:10 America/Toronto
+## Documentation audit split — 2026-10-23 14:26 America/Toronto
+
+- Reordered the GitHub landing page to introduce the compact experience before the expanded investigator.
+- Reduced the landing page to two distinct product images and removed repetitive Firefox-state screenshots from the portfolio narrative.
+- Separated the concise public `README.md` from the exhaustive engineering audit in `docs/HISTORY.md`.
+- Backfilled dedicated audit records for versions 0.1.0 through 0.8.0 with requests, bugs, challenges, decisions, commits, releases, limitations, and every retained screenshot link.
+- Kept screenshot assets centralized under `docs/screenshots/<version>/` so documentation shares canonical images without duplicated files.
+
+## 0.8.0 — 2026-10-23 14:17 America/Toronto
 
 - Added the optional **Memory Bloom Companion** Firefox extension, a local native-messaging bridge, and a Windows host installer. The companion supplies stable tab IDs plus the current title, URL, window, last-access time, active/hidden/discarded state, and event timing without making network requests.
 - Used Firefox activation, loading/reload, title, URL, move, create, close, replace, discard, and window-focus events to trigger prompt tab-catalog updates and a four-second PID-correlation window—even for a background reload.

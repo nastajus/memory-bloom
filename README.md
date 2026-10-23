@@ -6,7 +6,17 @@
 
 Memory Bloom is a quiet Windows memory-pressure companion. It stays invisible while memory is comfortable, then blooms into a small translucent signal as physical or committed memory becomes important. Click it for a process investigator when you need to understand what is using the machine.
 
-![Memory Bloom detailed view](docs/screenshots/v0.8.0/detailed.png)
+## Compact when everything is fine
+
+The primary view is deliberately small. Its ring, accent color, and whole-window opacity intensify with memory pressure; hovering makes it fully opaque. It can remain tucked against either side of a monitor, appear only when its configured threshold is crossed, and disappear again after pressure settles.
+
+![Memory Bloom compact pressure view](docs/screenshots/v0.8.0/minimal.png)
+
+## Expanded when you need an explanation
+
+A click opens the resizable investigator inward from the nearest monitor edge. It shows physical and committed memory, groups processes by application, and reconciles cache, kernel pools, and other shared Windows memory that ordinary per-process totals omit.
+
+![Memory Bloom expanded process view](docs/screenshots/v0.8.0/detailed.png)
 
 ## What it does
 
@@ -22,36 +32,19 @@ Memory Bloom is a quiet Windows memory-pressure companion. It stays invisible wh
 - Reconciles physical RAM not represented by process working sets into file cache, kernel pools, and other shared/OS memory.
 - Starts at sign-in, lives in the notification area, and creates a desktop launcher.
 
-The compact view remains intentionally small:
-
-![Memory Bloom compact view](docs/screenshots/v0.8.0/minimal.png)
-
 ## Firefox investigation
 
 Firefox does not expose a supported, authoritative tab-to-Windows-PID mapping. Memory Bloom therefore keeps the distinction visible:
 
-- Tab titles and approximate last-accessed times come from Firefox's local recovery snapshot.
+- Without the optional companion, tab titles and approximate last-accessed times come from Firefox's local recovery snapshot.
 - The foreground Firefox title is observed live, so the active title can appear immediately instead of waiting for the recovery file.
-- While the detailed view is open, a lightweight 500 ms sampler correlates foreground-title changes with short CPU and working-set bursts in Firefox candidate tab-host processes.
+- While the detailed view is open, a lightweight 250 ms sampler correlates tab activity with short CPU and working-set bursts in Firefox candidate tab-host processes.
 - Repeated samples are accumulated and decayed. A title is nested beneath a process only when one candidate separates from the others.
-- A current PID association lasts at most two minutes without fresh evidence. Its displayed confidence decays during that window; after expiry the title returns to **Unresolved tabs** with the old PID labeled as expired.
+- A current PID association lasts at most two minutes without fresh evidence. Its displayed confidence decays during that window; after expiry the title remains visibly attached as yellow historical evidence rather than being presented as current.
 - Live titles are tracked per Firefox window. This prevents one ChatGPT tab from becoming several synthetic tabs as its document title changes, while the next recovery snapshot distinguishes navigation from a true tab switch.
 - Unmatched titles remain under **Unresolved tabs**. Yellow text marks uncertain, aging, changed, or expired evidence.
+- The optional local companion supplies stable tab IDs, titles, URLs, last-access times, and tab lifecycle events. Firefox still does not expose each tab's Windows PID, so process placement remains measured inference.
 - The **Firefox tabs ↗** button opens Firefox's authoritative `about:processes` page.
-
-![Firefox process hierarchy](docs/screenshots/v0.8.0/firefox-processes.png)
-
-![Live and unresolved Firefox titles](docs/screenshots/v0.8.0/firefox-tabs.png)
-
-### Optional Firefox companion
-
-Firefox's delayed recovery snapshot is useful without installing anything, but it cannot consistently reveal background reloads or supply a durable tab identity. The optional companion sends the current local tab catalog and lifecycle events to Memory Bloom through Firefox native messaging. It makes no network requests.
-
-The companion makes tab awareness authoritative—IDs, titles, URLs, last-access time, active/hidden/discarded state—but Firefox does not expose each tab's Windows PID through the Tabs API. Memory Bloom therefore continues to label PID placement as inferred, with confidence, age, historical retention, and explicit unresolved rows.
-
-The source is in [`firefox-extension`](firefox-extension/README.md). The [development XPI](docs/releases/v0.8.0/MemoryBloom.Companion.xpi), [native bridge](docs/releases/v0.8.0/MemoryBloom.NativeHost.exe), and [host installer](docs/releases/v0.8.0/install-firefox-companion-host.ps1) are retained with the v0.8.0 release; persistent Firefox installation requires Mozilla signing.
-
-“Static” is not a Firefox state. It is shorthand for a page that is currently too quiet to create a distinctive CPU or working-set signal. A newly opened blank tab, an idle loaded page, or a suspended/discarded background page can all be quiet. Disuse can make a page quieter, but the page itself does not degrade; Memory Bloom deliberately expires its unrefreshed PID evidence after two minutes because continued high confidence would be misleading. A normal Firefox extension could improve title freshness, stable tab identity, and tab actions, but Firefox's supported extension API still does not reveal the content-process PID.
 
 ## Install and run
 
@@ -88,4 +81,4 @@ All memory, process, and Firefox recovery data is read locally. Memory Bloom sen
 
 Virtual-desktop pinning uses the Windows shell's own internal pinning service—the same behavior exposed as **Show this window on all desktops**. Microsoft does not publish that interface as a stable desktop API, so Memory Bloom treats pinning as best-effort and safely continues on one desktop if a future Windows update changes it.
 
-Development history, visual checkpoints, and next steps are recorded in [PROGRESS.md](PROGRESS.md) and [CHANGELOG.md](CHANGELOG.md).
+The public changelog is in [CHANGELOG.md](CHANGELOG.md). The exhaustive engineering audit—including reported bugs, implementation challenges, decisions, limitations, and every retained screenshot—is kept separately in [docs/HISTORY.md](docs/HISTORY.md).
