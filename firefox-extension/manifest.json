@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "Memory Bloom Companion",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "Sends Firefox's tab catalog and tab lifecycle events to the local Memory Bloom app.",
   "browser_specific_settings": {
     "gecko": {

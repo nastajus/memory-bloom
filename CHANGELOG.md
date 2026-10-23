@@ -2,6 +2,16 @@
 
 Dates are reconstructed from the conversation and build artifacts where available. Early version boundaries are approximate because Git tracking was requested after development had already begun.
 
+## 0.9.0 — 2026-10-23
+
+- Added four semantic pressure taglines—comfortable, rising, busy, and critical—while retaining continuous color, pulse, arc, and opacity interpolation.
+- Added deterministic compact preview captures at 55%, 74%, 82%, and 92% pressure. The PNG alpha values preserve each tier's true resting transparency.
+- Backfilled the tier captures into the 0.1.0 visual history, where pressure-proportional presentation originated, while documenting that the images were reconstructed with the current renderer.
+- Added one staged low-pressure image beside the existing fully opaque 92% compact image on the public README.
+- Sorted the aggregate **Tab hosts** section among Firefox's other child PIDs by its summed private memory; PIDs inside the section remain memory-descending.
+- Moved **Unresolved tabs** to the top of the Tab hosts section as a temporary diagnostic-first layout.
+- Added a blue `●` symbol and stronger title color to tab-host PIDs with one or more current inferred web-page links.
+
 ## Documentation audit split — 2026-10-23 14:26 America/Toronto
 
 - Reordered the GitHub landing page to introduce the compact experience before the expanded investigator.

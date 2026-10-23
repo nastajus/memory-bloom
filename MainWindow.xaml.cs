@@ -212,6 +212,7 @@ public partial class MainWindow : Window
         Pulse.Fill = new SolidColorBrush(Color.FromArgb((byte)(44 + 115 * intensity), color.R, color.G, color.B));
         Pulse.Width = Pulse.Height = 30 + 12 * intensity;
         HeaderDot.Fill = brush;
+        PressureTagline.Text = PressureTaglineFor(pressure);
         PercentText.Text = $"{pressure:0}";
         DetailPercent.Text = $"{pressure:0}%";
         SummaryText.Text = $"{FormatBytes(reading.PhysicalUsedBytes)} of {FormatBytes(reading.PhysicalTotalBytes)} in use";
@@ -222,6 +223,14 @@ public partial class MainWindow : Window
         Opacity = IsMouseOver ? 1 : _restingOpacity;
         Shell.BorderBrush = new SolidColorBrush(Color.FromArgb((byte)(70 + 110 * intensity), color.R, color.G, color.B));
         _tray.Text = $"Memory Bloom — {pressure:0}% pressure";
+    }
+
+    private string PressureTaglineFor(double pressure)
+    {
+        if (pressure < _settings.HideBelowPercent) return "Memory is comfortable";
+        if (pressure < _settings.ShowAtPercent) return "Memory use is rising";
+        if (pressure < 90) return "Memory is getting busy";
+        return "Critical memory pressure";
     }
 
     private async Task RefreshProcessesAsync()
@@ -610,7 +619,6 @@ public partial class MainWindow : Window
             if (group.IsFirefox)
             {
                 var tabHosts = OrderProcessesByMemory(group.Processes.Where(IsFirefoxTabHost)).ToList();
-                foreach (var process in OrderProcessesByMemory(group.Processes.Except(tabHosts))) root.Items.Add(MakeProcessTreeItem(process, true, rowDepth: 1));
                 var tabsByPid = firefoxTabs.Tabs
                     .Select(tab => (Tab: tab, Association: _tabAssociations.GetValueOrDefault(TabKey(tab))))
                     .Where(item => item.Association is not null && tabHosts.Any(process => process.Pid == item.Association.Pid))
@@ -626,18 +634,24 @@ public partial class MainWindow : Window
                     Tag = new FirefoxContentSection("Tab hosts"),
                     IsExpanded = _firefoxContentExpanded
                 };
-                foreach (var process in tabHosts)
-                {
-                    tabsByPid.TryGetValue(process.Pid, out var associatedTabs);
-                    contentSection.Items.Add(MakeProcessTreeItem(process, true, associatedTabs, firefoxTabs, rowDepth: 2));
-                }
                 var unresolved = firefoxTabs.Tabs.Where(tab =>
                 {
                     var association = _tabAssociations.GetValueOrDefault(TabKey(tab));
                     return association is null || tabHosts.All(process => process.Pid != association.Pid);
                 }).ToList();
                 contentSection.Items.Add(MakeUnresolvedTabsSection(group, firefoxTabs, unresolved));
-                root.Items.Add(contentSection);
+                foreach (var process in tabHosts)
+                {
+                    tabsByPid.TryGetValue(process.Pid, out var associatedTabs);
+                    contentSection.Items.Add(MakeProcessTreeItem(process, true, associatedTabs, firefoxTabs, rowDepth: 2));
+                }
+
+                var firefoxChildren = group.Processes.Except(tabHosts)
+                    .Select(process => (Weight: process.PrivateBytes, Item: MakeProcessTreeItem(process, true, rowDepth: 1)))
+                    .Append((Weight: tabHosts.Sum(process => process.PrivateBytes), Item: contentSection))
+                    .OrderByDescending(item => item.Weight)
+                    .ToList();
+                foreach (var item in firefoxChildren) root.Items.Add(item.Item);
             }
             else
             {
@@ -666,6 +680,7 @@ public partial class MainWindow : Window
             descriptor = Trim(process.WindowTitle, 42);
         var currentTabCount = associatedTabs?.Count(item => item.Association is not null && IsAssociationCurrent(item.Association)) ?? 0;
         var historicalTabCount = associatedTabs?.Count - currentTabCount ?? 0;
+        var containsCurrentWebPage = firefox && IsFirefoxTabHost(process) && currentTabCount > 0;
         if (firefox && IsFirefoxTabHost(process))
             descriptor += currentTabCount == 0 && historicalTabCount == 0
                 ? " · no tab observed"
@@ -673,14 +688,15 @@ public partial class MainWindow : Window
         var child = new TreeViewItem
         {
             Header = MakeRow(
-                process.IsSynthetic ? process.DisplayName : $"PID {process.Pid}",
+                process.IsSynthetic ? process.DisplayName : containsCurrentWebPage ? $"● PID {process.Pid}" : $"PID {process.Pid}",
                 descriptor,
                 FormatBytes(process.PrivateBytes),
                 firefox,
                 process.IsSynthetic
                     ? process.Tooltip
-                    : $"Private committed memory: {FormatBytes(process.PrivateBytes)}. Current physical working set: {FormatBytes(process.WorkingSetBytes)}. {process.Role}",
-                depth: rowDepth),
+                    : $"Private committed memory: {FormatBytes(process.PrivateBytes)}. Current physical working set: {FormatBytes(process.WorkingSetBytes)}. {process.Role}{(containsCurrentWebPage ? " A blue dot marks a host with one or more current inferred web-page links." : "")}",
+                depth: rowDepth,
+                activeHost: containsCurrentWebPage),
             Tag = process,
             ToolTip = process.Tooltip,
             IsExpanded = _processExpansionState.GetValueOrDefault(process.Pid)
@@ -781,15 +797,15 @@ public partial class MainWindow : Window
         };
     }
 
-    private static Grid MakeRow(string title, string subtitle, string memory, bool accent, string tooltip, bool warning = false, int depth = 0)
+    private static Grid MakeRow(string title, string subtitle, string memory, bool accent, string tooltip, bool warning = false, int depth = 0, bool activeHost = false)
     {
         var grid = new Grid { Width = 650, Margin = new Thickness(2, 2, 3, 2) };
         grid.ToolTip = tooltip;
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(285) });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(85) });
-        var titleColor = warning ? Color.FromRgb(230, 190, 92) : accent ? Color.FromRgb(117, 214, 178) : Color.FromRgb(240, 244, 245);
-        var a = new TextBlock { Text = title, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(titleColor), TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 0, 10, 0) };
+        var titleColor = warning ? Color.FromRgb(230, 190, 92) : activeHost ? Color.FromRgb(92, 203, 255) : accent ? Color.FromRgb(117, 214, 178) : Color.FromRgb(240, 244, 245);
+        var a = new TextBlock { Text = title, FontWeight = activeHost ? FontWeights.Bold : FontWeights.SemiBold, Foreground = new SolidColorBrush(titleColor), TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 0, 10, 0) };
         var b = new TextBlock { Text = subtitle, Foreground = new SolidColorBrush(Color.FromRgb(168, 182, 186)), TextTrimming = TextTrimming.CharacterEllipsis };
         var c = new TextBlock { Text = memory, Foreground = Brushes.WhiteSmoke, HorizontalAlignment = HorizontalAlignment.Right };
         Grid.SetColumn(a, 0); Grid.SetColumn(b, 1); Grid.SetColumn(c, 2);
@@ -1273,10 +1289,56 @@ public partial class MainWindow : Window
             ShowMinimal(manual: true);
             UpdateLayout();
             SaveVisual(System.IO.Path.Combine(folder, "minimal.png"));
+            CapturePressureTierPreviews(folder);
         }
         finally
         {
             ExitApp();
+        }
+    }
+
+    private void CapturePressureTierPreviews(string folder)
+    {
+        var originalShowAt = _settings.ShowAtPercent;
+        var originalHideBelow = _settings.HideBelowPercent;
+        var stages = new[]
+        {
+            (Name: "tier-comfortable-55", Percent: 55d),
+            (Name: "tier-rising-74", Percent: 74d),
+            (Name: "tier-busy-82", Percent: 82d),
+            (Name: "tier-critical-92", Percent: 92d)
+        };
+        const ulong physicalTotal = 32UL * 1024 * 1024 * 1024;
+        const ulong commitLimit = 48UL * 1024 * 1024 * 1024;
+        try
+        {
+            _settings.ShowAtPercent = 78;
+            _settings.HideBelowPercent = 72;
+            foreach (var stage in stages)
+            {
+                var physicalUsed = (ulong)(physicalTotal * stage.Percent / 100d);
+                var commitUsed = (ulong)(commitLimit * stage.Percent / 100d);
+                UpdateMemoryVisuals(new MemoryReading(
+                    stage.Percent,
+                    physicalUsed,
+                    physicalTotal,
+                    stage.Percent,
+                    commitUsed,
+                    commitLimit,
+                    0,
+                    0,
+                    0));
+                Opacity = 1;
+                Shell.Opacity = _restingOpacity;
+                UpdateLayout();
+                SaveVisual(System.IO.Path.Combine(folder, $"{stage.Name}.png"));
+            }
+        }
+        finally
+        {
+            Shell.Opacity = 1;
+            _settings.ShowAtPercent = originalShowAt;
+            _settings.HideBelowPercent = originalHideBelow;
         }
     }
 

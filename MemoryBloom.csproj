@@ -8,9 +8,9 @@
     <Nullable>enable</Nullable>
     <AssemblyName>MemoryBloom</AssemblyName>
     <RootNamespace>MemoryBloom</RootNamespace>
-    <Version>0.8.0</Version>
-    <AssemblyVersion>0.8.0.0</AssemblyVersion>
-    <FileVersion>0.8.0.0</FileVersion>
+    <Version>0.9.0</Version>
+    <AssemblyVersion>0.9.0.0</AssemblyVersion>
+    <FileVersion>0.9.0.0</FileVersion>
     <ApplicationIcon>Assets\MemoryBloom.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <DefaultItemExcludes>$(DefaultItemExcludes);obj\**;bin\**;verify-bin\**;verify-obj\**;release\**;release-v*-staging\**;publish\**</DefaultItemExcludes>

@@ -16,8 +16,9 @@ Each checkpoint has a detailed record under [`docs/history/`](history/). Screens
 | 0.6.0 | Honest Firefox host language and visual polish | [v0.6.0](history/v0.6.0.md) |
 | 0.7.0 | Edge-aware expansion and expiring evidence | [v0.7.0](history/v0.7.0.md) |
 | 0.8.0 | Firefox companion and durable historical evidence | [v0.8.0](history/v0.8.0.md) |
+| 0.9.0 | Pressure tiers and diagnostic-first Firefox ordering | [v0.9.0](history/v0.9.0.md) |
 
-## Current state — 0.8.0
+## Current state — 0.9.0
 
 - Conditional pressure widget with proportional opacity/color intensity; hovering anywhere over the window temporarily makes it fully opaque.
 - Compact and detailed modes with click-versus-drag handling, native Windows move/resize styles, standard edge Snap/maximize previews, and monitor-aware expansion toward the available half of the screen.
@@ -38,15 +39,18 @@ Each checkpoint has a detailed record under [`docs/history/`](history/). Screens
 - Dark process context menus and scrollbar, with wider wrapping tooltips that reveal the complete explanation.
 - One DPI-scaled native region follows the panel's 22-DIP curve, removing the competing second corner while retaining Windows resize/Snap behavior.
 - Passive development restarts preserve the user's foreground window and avoid a flashing taskbar request for attention.
+- Compact language now follows four pressure tiers while color, pulse, arc, and opacity continue to interpolate smoothly.
+- The Tab hosts aggregate is sorted alongside Firefox child processes by memory; Unresolved tabs is temporarily first inside it, and current linked hosts receive a blue `●` marker.
 
 Screenshots:
 
-- [Overall accounting 0.8.0](screenshots/v0.8.0/detailed.png)
-- [Firefox host status 0.8.0](screenshots/v0.8.0/firefox-processes.png)
-- [Unresolved catalog 0.8.0](screenshots/v0.8.0/firefox-tabs.png)
-- [Compact 0.8.0](screenshots/v0.8.0/minimal.png)
+- [Overall accounting 0.9.0](screenshots/v0.9.0/detailed.png)
+- [Firefox host status 0.9.0](screenshots/v0.9.0/firefox-processes.png)
+- [Diagnostic-first unresolved catalog 0.9.0](screenshots/v0.9.0/firefox-tabs.png)
+- [Compact 0.9.0](screenshots/v0.9.0/minimal.png)
+- [Four staged pressure tiers](history/v0.9.0.md#visual-evidence)
 
-## Next state — 0.9.0
+## Next state — 0.10.0
 
 - Load the companion in Firefox after explicit installation confirmation, validate full catalog/event delivery against ordinary browsing, then pursue Mozilla signing for persistence across Firefox restarts.
 - Tune event-to-process correlation using real reload/navigation cases, especially several background tabs refreshed close together.
@@ -54,6 +58,14 @@ Screenshots:
 - Consider persisting recent inferred associations across app restarts with a short expiry.
 
 ## Iterations
+
+### 0.9.0 — Pressure tiers and diagnostic-first Firefox ordering
+
+Last state: compact captures only reflected whatever live pressure existed during preview; the fixed “Memory is getting busy” phrase did not distinguish low, rising, and critical states; Tab hosts always followed ordinary Firefox PIDs; and Unresolved tabs appeared after all candidate processes despite being the primary current diagnostic.
+
+Result: deterministic staged captures document four semantic pressure levels with genuine proportional alpha, and the 0.1.0 record now carries that reconstructed evidence because the visualization originated there. Tab hosts participates in Firefox child memory ordering, Unresolved appears first inside it, and hosts with current inferred pages use a blue `●` marker.
+
+Next state: observe the new host cue with live companion data and restore Unresolved to the bottom when the unresolved rate is low enough for it to represent an exception.
 
 ### 0.8.0 — Authoritative tab awareness and durable historical evidence
 
@@ -148,11 +160,12 @@ Next state: improve direct manipulation and Firefox process descriptions.
 
 Every generated checkpoint below is retained and linked here. Version 0.2.0 predates the automated capture workflow and has a [reconstructed functional record](history/v0.2.0.md) rather than screenshots.
 
-- 0.1.0: [detailed](screenshots/v0.1.0/detailed.png), [minimal](screenshots/v0.1.0/minimal.png)
+- 0.1.0: [detailed](screenshots/v0.1.0/detailed.png), [minimal](screenshots/v0.1.0/minimal.png), [comfortable 55%](screenshots/v0.1.0/tier-comfortable-55.png), [rising 74%](screenshots/v0.1.0/tier-rising-74.png), [busy 82%](screenshots/v0.1.0/tier-busy-82.png), [critical 92%](screenshots/v0.1.0/tier-critical-92.png)
 - 0.3.0: [detailed](screenshots/v0.3.0/detailed.png), [minimal](screenshots/v0.3.0/minimal.png)
 - 0.4.0: [detailed](screenshots/v0.4.0/detailed.png), [Firefox processes](screenshots/v0.4.0/firefox-processes.png), [Firefox tabs](screenshots/v0.4.0/firefox-tabs.png), [minimal](screenshots/v0.4.0/minimal.png)
 - 0.5.0: [detailed](screenshots/v0.5.0/detailed.png), [Firefox processes](screenshots/v0.5.0/firefox-processes.png), [Firefox tabs](screenshots/v0.5.0/firefox-tabs.png), [minimal](screenshots/v0.5.0/minimal.png), [icon](screenshots/v0.5.0/icon.png)
 - 0.6.0: [reported context](screenshots/v0.6.0/reported-before-firefox-restart.png), [detailed](screenshots/v0.6.0/detailed.png), [Firefox candidate hosts](screenshots/v0.6.0/firefox-processes.png), [Firefox tabs](screenshots/v0.6.0/firefox-tabs.png), [minimal](screenshots/v0.6.0/minimal.png)
 - 0.7.0: [reported corner context](screenshots/v0.7.0/reported-before-double-corners.png), [reported Firefox context](screenshots/v0.7.0/reported-before-stale-tab-links.png), [detailed](screenshots/v0.7.0/detailed.png), [memory-sorted Firefox hosts](screenshots/v0.7.0/firefox-processes.png), [Firefox tabs](screenshots/v0.7.0/firefox-tabs.png), [compact](screenshots/v0.7.0/minimal.png)
 - 0.8.0: [reported Firefox ground truth](screenshots/v0.8.0/reported-firefox-open-tabs.png), [reported missed links](screenshots/v0.8.0/reported-missed-and-duplicate-links.png), [detailed](screenshots/v0.8.0/detailed.png), [Firefox hosts](screenshots/v0.8.0/firefox-processes.png), [unresolved catalog](screenshots/v0.8.0/firefox-tabs.png), [compact](screenshots/v0.8.0/minimal.png)
+- 0.9.0: [detailed](screenshots/v0.9.0/detailed.png), [Firefox hosts](screenshots/v0.9.0/firefox-processes.png), [diagnostic unresolved view](screenshots/v0.9.0/firefox-tabs.png), [compact](screenshots/v0.9.0/minimal.png), [comfortable 55%](screenshots/v0.9.0/tier-comfortable-55.png), [rising 74%](screenshots/v0.9.0/tier-rising-74.png), [busy 82%](screenshots/v0.9.0/tier-busy-82.png), [critical 92%](screenshots/v0.9.0/tier-critical-92.png)
 

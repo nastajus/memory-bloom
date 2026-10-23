@@ -5,6 +5,6 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AssemblyName>MemoryBloom.NativeHost</AssemblyName>
-    <Version>0.8.0</Version>
+    <Version>0.9.0</Version>
   </PropertyGroup>
 </Project>

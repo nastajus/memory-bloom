@@ -8,15 +8,17 @@ Memory Bloom is a quiet Windows memory-pressure companion. It stays invisible wh
 
 ## Compact when everything is fine
 
-The primary view is deliberately small. Its ring, accent color, and whole-window opacity intensify with memory pressure; hovering makes it fully opaque. It can remain tucked against either side of a monitor, appear only when its configured threshold is crossed, and disappear again after pressure settles.
+The primary view is deliberately small. Its ring, accent color, status language, and whole-window opacity intensify with memory pressure; hovering makes it fully opaque. It can remain tucked against either side of a monitor, appear only when its configured threshold is crossed, and disappear again after pressure settles.
 
-![Memory Bloom compact pressure view](docs/screenshots/v0.8.0/minimal.png)
+| Staged comfortable state · normally hidden | High pressure · fully opaque on hover |
+|---|---|
+| ![Memory Bloom at 55 percent with low resting opacity](docs/screenshots/v0.1.0/tier-comfortable-55.png) | ![Memory Bloom at 92 percent and fully opaque](docs/screenshots/v0.8.0/minimal.png) |
 
 ## Expanded when you need an explanation
 
 A click opens the resizable investigator inward from the nearest monitor edge. It shows physical and committed memory, groups processes by application, and reconciles cache, kernel pools, and other shared Windows memory that ordinary per-process totals omit.
 
-![Memory Bloom expanded process view](docs/screenshots/v0.8.0/detailed.png)
+![Memory Bloom expanded process view](docs/screenshots/v0.9.0/detailed.png)
 
 ## What it does
 
@@ -50,7 +52,7 @@ Firefox does not expose a supported, authoritative tab-to-Windows-PID mapping. M
 
 Memory Bloom currently targets Windows 11 and the .NET 10 Desktop Runtime.
 
-1. Download [MemoryBloom.exe](docs/releases/v0.8.0/MemoryBloom.exe), or build it locally.
+1. Download [MemoryBloom.exe](docs/releases/v0.9.0/MemoryBloom.exe), or build it locally.
 2. Run it once. Use `Ctrl+Alt+M` or the notification-area icon to bring it into focus.
 3. To install sign-in startup and the desktop shortcut, run:
 
