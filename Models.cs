@@ -11,6 +11,7 @@ internal sealed class AppSettings
     public double ShowAtPercent { get; set; } = 78;
     public double HideBelowPercent { get; set; } = 72;
     public double Scale { get; set; } = 1.0;
+    public double ProcessFontSize { get; set; } = 13.0;
     public double Left { get; set; } = double.NaN;
     public double Top { get; set; } = double.NaN;
 

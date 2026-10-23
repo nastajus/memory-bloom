@@ -4,6 +4,12 @@ Concise user-visible release notes. The engineering audit is kept separately in 
 
 Dates for early releases are reconstructed from the conversation and build artifacts because Git tracking began after initial development.
 
+## 0.12.0 — 2026-10-23
+
+- Added a persistent 10–18 pt process-text slider to the detailed view.
+- Reflowed the footer into actions, selection status, and aligned text-size/alert controls.
+- Replaced fixed process-row widths with live viewport/depth-aware layout so enlarged text preserves hierarchy and right-aligned memory values.
+
 ## 0.11.0 — 2026-10-23
 
 - Added the shared dark **Exit Memory Bloom** menu to the detailed title bar as well as compact mode.

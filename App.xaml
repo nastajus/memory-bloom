@@ -27,8 +27,8 @@
         </Style>
         <Style TargetType="TreeViewItem">
             <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
-            <Setter Property="FontSize" Value="13"/>
             <Setter Property="Padding" Value="2"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
         </Style>
         <Style TargetType="ToolTip">
             <Setter Property="Foreground" Value="#FFF0F4F5"/>

@@ -83,21 +83,47 @@
                 </Grid>
                 <Border Grid.Row="2" Background="#66253034" CornerRadius="14" Padding="8">
                     <TreeView x:Name="ProcessTree" Background="Transparent" BorderThickness="0"
+                              HorizontalContentAlignment="Stretch"
                               ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                               SelectedItemChanged="ProcessTree_SelectedItemChanged"
                               PreviewMouseRightButtonDown="ProcessTree_PreviewMouseRightButtonDown"
                               MouseDoubleClick="ProcessTree_MouseDoubleClick"/>
                 </Border>
                 <Grid Grid.Row="3" Margin="0,8,0,0">
-                    <StackPanel Orientation="Horizontal">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <Button x:Name="FocusButton" Click="Focus_Click" IsEnabled="False">Bring to front</Button>
                         <Button x:Name="EndButton" Click="End_Click" IsEnabled="False" Background="#553F2225" BorderBrush="#885E3439">End process…</Button>
-                        <TextBlock x:Name="SelectionText" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="8,0,0,0"/>
                     </StackPanel>
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                        <TextBlock Text="Alert at" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
-                        <Slider x:Name="ThresholdSlider" Minimum="65" Maximum="95" Width="92" Margin="8,0" ValueChanged="ThresholdSlider_ValueChanged"/>
-                        <TextBlock x:Name="ThresholdText" Foreground="{StaticResource TextPrimary}" Width="34" VerticalAlignment="Center"/>
+                    <TextBlock x:Name="SelectionText" Grid.Column="1" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"
+                               Margin="8,0" TextTrimming="CharacterEllipsis"/>
+                    <StackPanel Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center" MinWidth="226">
+                        <Grid Margin="0,0,0,2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="62"/>
+                                <ColumnDefinition Width="112"/>
+                                <ColumnDefinition Width="44"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Text size" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                            <Slider x:Name="ProcessFontSizeSlider" Grid.Column="1" Minimum="10" Maximum="18" TickFrequency="1"
+                                    IsSnapToTickEnabled="True" Margin="7,0" ValueChanged="ProcessFontSizeSlider_ValueChanged"
+                                    ToolTip="Adjust process and Firefox tab text"/>
+                            <TextBlock x:Name="ProcessFontSizeText" Grid.Column="2" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                        </Grid>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="62"/>
+                                <ColumnDefinition Width="112"/>
+                                <ColumnDefinition Width="44"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Alert at" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                            <Slider x:Name="ThresholdSlider" Grid.Column="1" Minimum="65" Maximum="95" Margin="7,0" ValueChanged="ThresholdSlider_ValueChanged"/>
+                            <TextBlock x:Name="ThresholdText" Grid.Column="2" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                        </Grid>
                     </StackPanel>
                 </Grid>
             </Grid>

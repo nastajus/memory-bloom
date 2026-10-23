@@ -2,6 +2,7 @@ using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
@@ -9,6 +10,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
+using System.Windows.Data;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
@@ -53,6 +55,20 @@ public partial class MainWindow : Window
     private const uint WmNcLButtonDown = 0x00A1;
     private static readonly TimeSpan CurrentAssociationLifetime = TimeSpan.FromMinutes(2);
     private static readonly IntPtr HtCaption = new(2);
+    private static readonly ProcessRowWidthConverter RowWidthConverter = new();
+
+    private sealed class ProcessRowWidthConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            var available = value is double width ? width : 0;
+            var depth = parameter is int integer ? integer : 0;
+            return Math.Max(320, available - 42 - depth * 18);
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+            throw new NotSupportedException();
+    }
 
     private readonly AppSettings _settings = AppSettings.Load();
     private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromSeconds(2) };
@@ -93,6 +109,7 @@ public partial class MainWindow : Window
     private bool _ready;
     private bool _surfacePointerDown;
     private bool _surfaceDragging;
+    private bool _updatingProcessFontSize;
     private Point _pointerStartScreen;
     private bool _hasCompactAnchor;
     private bool _compactAnchoredRight;
@@ -108,6 +125,10 @@ public partial class MainWindow : Window
         Opacity = 0;
         ThresholdSlider.Value = _settings.ShowAtPercent;
         ThresholdText.Text = $"{_settings.ShowAtPercent:0}%";
+        _settings.ProcessFontSize = Math.Clamp(Math.Round(_settings.ProcessFontSize), 10, 18);
+        ProcessTree.FontSize = _settings.ProcessFontSize;
+        ProcessFontSizeSlider.Value = _settings.ProcessFontSize;
+        ProcessFontSizeText.Text = $"{_settings.ProcessFontSize:0} pt";
 
         _tray = new Forms.NotifyIcon
         {
@@ -800,13 +821,14 @@ public partial class MainWindow : Window
         };
     }
 
-    private static Grid MakeRow(string title, string subtitle, string memory, bool accent, string tooltip, bool warning = false, int depth = 0, bool activeHost = false)
+    private Grid MakeRow(string title, string subtitle, string memory, bool accent, string tooltip, bool warning = false, int depth = 0, bool activeHost = false)
     {
-        var grid = new Grid { Width = 650, Margin = new Thickness(2, 2, 3, 2) };
+        var grid = new Grid { HorizontalAlignment = HorizontalAlignment.Stretch, Margin = new Thickness(2, 2, 3, 2) };
+        grid.SetBinding(WidthProperty, new Binding(nameof(ActualWidth)) { Source = ProcessTree, Converter = RowWidthConverter, ConverterParameter = depth });
         grid.ToolTip = tooltip;
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(285) });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(85) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(4, GridUnitType.Star), MinWidth = 120 });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(6, GridUnitType.Star), MinWidth = 120 });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto, MinWidth = 76 });
         var titleColor = warning ? Color.FromRgb(230, 190, 92) : activeHost ? Color.FromRgb(92, 203, 255) : accent ? Color.FromRgb(117, 214, 178) : Color.FromRgb(240, 244, 245);
         var a = new TextBlock { Text = title, FontWeight = activeHost ? FontWeights.Bold : FontWeights.SemiBold, Foreground = new SolidColorBrush(titleColor), TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 0, 10, 0) };
         var b = new TextBlock { Text = subtitle, Foreground = new SolidColorBrush(Color.FromRgb(168, 182, 186)), TextTrimming = TextTrimming.CharacterEllipsis };
@@ -816,9 +838,10 @@ public partial class MainWindow : Window
         return grid;
     }
 
-    private static Grid MakeTabRow(string title, string status, string tooltip, bool warning, int depth)
+    private Grid MakeTabRow(string title, string status, string tooltip, bool warning, int depth)
     {
-        var grid = new Grid { Width = Math.Max(560, 680 - depth * 18), Margin = new Thickness(2, 3, 3, 3), ToolTip = tooltip };
+        var grid = new Grid { HorizontalAlignment = HorizontalAlignment.Stretch, Margin = new Thickness(2, 3, 3, 3), ToolTip = tooltip };
+        grid.SetBinding(WidthProperty, new Binding(nameof(ActualWidth)) { Source = ProcessTree, Converter = RowWidthConverter, ConverterParameter = depth });
         grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         var titleColor = warning ? Color.FromRgb(230, 190, 92) : Color.FromRgb(117, 214, 178);
@@ -836,7 +859,7 @@ public partial class MainWindow : Window
             Foreground = new SolidColorBrush(warning ? Color.FromRgb(218, 184, 105) : Color.FromRgb(168, 182, 186)),
             TextTrimming = TextTrimming.CharacterEllipsis,
             Margin = new Thickness(12, 1, 8, 0),
-            FontSize = 11
+            FontSize = Math.Max(9, _settings.ProcessFontSize - 2)
         };
         Grid.SetRow(statusBlock, 1);
         grid.Children.Add(titleBlock);
@@ -1289,6 +1312,7 @@ public partial class MainWindow : Window
             (previewTab ?? previewTabsSection)?.BringIntoView();
             UpdateLayout();
             SaveVisual(System.IO.Path.Combine(folder, "firefox-tabs.png"));
+            CaptureLargeProcessTextPreview(System.IO.Path.Combine(folder, "detailed-large-text.png"));
 
             ShowMinimal(manual: true);
             UpdateLayout();
@@ -1387,6 +1411,16 @@ public partial class MainWindow : Window
         }
     }
 
+    private void CaptureLargeProcessTextPreview(string path)
+    {
+        var originalSize = _settings.ProcessFontSize;
+        ApplyProcessFontSize(17, persist: false);
+        UpdateLayout();
+        SaveVisual(path);
+        ApplyProcessFontSize(originalSize, persist: false);
+        UpdateLayout();
+    }
+
     private void SaveVisual(string path)
     {
         var width = Math.Max(1, (int)Math.Ceiling(ActualWidth));
@@ -1421,6 +1455,28 @@ public partial class MainWindow : Window
         _settings.HideBelowPercent = Math.Max(60, _settings.ShowAtPercent - 6);
         ThresholdText.Text = $"{_settings.ShowAtPercent:0}%";
         _settings.Save();
+    }
+
+    private void ProcessFontSizeSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (!_ready || _updatingProcessFontSize) return;
+        ApplyProcessFontSize(e.NewValue, persist: true);
+    }
+
+    private void ApplyProcessFontSize(double value, bool persist)
+    {
+        var size = Math.Clamp(Math.Round(value), 10, 18);
+        _settings.ProcessFontSize = size;
+        ProcessTree.FontSize = size;
+        ProcessFontSizeText.Text = $"{size:0} pt";
+        if (Math.Abs(ProcessFontSizeSlider.Value - size) > 0.01)
+        {
+            _updatingProcessFontSize = true;
+            ProcessFontSizeSlider.Value = size;
+            _updatingProcessFontSize = false;
+        }
+        if (_latestGroups.Count > 0) PopulateTree(_latestGroups, _latestFirefoxTabs);
+        if (persist) _settings.Save();
     }
 
     private static Geometry MakeArc(double fraction)

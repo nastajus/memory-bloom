@@ -18,7 +18,7 @@ The primary view is deliberately small. Its ring, accent color, status language,
 
 A click opens the resizable investigator inward from the nearest monitor edge. It shows physical and committed memory, groups processes by application, and reconciles cache, kernel pools, and other shared Windows memory that ordinary per-process totals omit.
 
-![Memory Bloom expanded process view](docs/screenshots/v0.9.0/detailed.png)
+![Memory Bloom expanded process view with text-size and alert controls](docs/screenshots/v0.12.0/detailed.png)
 
 ## What it does
 
@@ -59,7 +59,7 @@ The companion is necessary for a prompt, complete catalog of open tabs. Without 
 
 Memory Bloom currently targets Windows 11 and the .NET 10 Desktop Runtime.
 
-1. Download [MemoryBloom.exe](docs/releases/v0.11.0/MemoryBloom.exe), or build it locally.
+1. Download [MemoryBloom.exe](docs/releases/v0.12.0/MemoryBloom.exe), or build it locally.
 2. Run it once. Use `Ctrl+Alt+M` or the notification-area icon to bring it into focus.
 3. To install sign-in startup and the desktop shortcut, run:
 
@@ -81,6 +81,7 @@ The build is written to `release\MemoryBloom.exe`. Settings are stored under `%L
 - Drag either surface normally; Windows handles edge Snap and maximize behavior.
 - Use `+` / `−` or Ctrl + mouse wheel to scale the compact view.
 - Right-click either the compact view or the detailed title bar and choose **Exit Memory Bloom** to quit.
+- Use the detailed view's **Text size** slider to resize process and Firefox tab text from 10–18 pt; the choice persists.
 - Double-click a process to bring its window forward.
 - Right-click a process for **Bring to front** and **End process…**.
 - Press `Ctrl+Alt+M` or double-click the tray icon to show details.
