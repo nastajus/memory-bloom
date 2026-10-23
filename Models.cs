@@ -61,6 +61,7 @@ internal sealed class ProcessSnapshot
     public string Role { get; init; } = "";
     public string Tooltip { get; init; } = "";
     public bool IsSynthetic { get; init; }
+    public double CpuTotalMilliseconds { get; init; }
 }
 
 internal sealed class ProcessGroup
@@ -84,3 +85,13 @@ internal sealed class FirefoxTabsSnapshot
 
 internal sealed record FirefoxTabSection(string Name);
 internal sealed record FirefoxContentSection(string Name);
+
+internal sealed class TabProcessAssociation
+{
+    public required string Key { get; init; }
+    public int Pid { get; set; }
+    public int? PreviousPid { get; set; }
+    public DateTime ObservedUtc { get; set; }
+    public DateTime? DriftDetectedUtc { get; set; }
+    public double Confidence { get; set; }
+}

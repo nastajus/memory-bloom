@@ -2,6 +2,17 @@
 
 Dates are reconstructed from the conversation and build artifacts where available. Early version boundaries are approximate because Git tracking was requested after development had already begun.
 
+## 0.4.0 — 2026-10-23 10:21 America/Toronto
+
+- Nested known Firefox titles beneath the inferred web-content process instead of presenting all known tabs as a separate peer list.
+- Added conservative foreground activity inference using title matching plus short CPU and working-set deltas.
+- Kept tabs without a defensible match in an explicit **Unresolved tabs** subsection.
+- Added association confidence and observation age, recent PID drift detection, and yellow styling for stale, uncertain, or recently moved mappings.
+- Preserved the expanded/collapsed state of each Firefox content-process row across refreshes.
+- Gave web titles a full-width line and moved last-accessed/match details to an indented second line.
+- Aligned group, process, and Windows/cache/shared memory values to one right edge while keeping them clear of the scrollbar.
+- Added versioned screenshots, executable snapshots, a reconstructed Git history, and a project-local per-prompt documentation/autocommit workflow.
+
 ## 0.3.0 — 2026-10-23 10:04 America/Toronto
 
 - Added Firefox tab titles and approximate last-accessed ages from Firefox's local recovery snapshot—no extension required.

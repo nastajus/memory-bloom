@@ -224,7 +224,8 @@ internal static class MemoryProbe
                         WorkingSetBytes = process.WorkingSet64,
                         CommandLine = extra.Command ?? "",
                         WindowTitle = process.MainWindowTitle,
-                        Role = RoleFor(name, extra.Command ?? "", process.MainWindowTitle)
+                        Role = RoleFor(name, extra.Command ?? "", process.MainWindowTitle),
+                        CpuTotalMilliseconds = process.TotalProcessorTime.TotalMilliseconds
                     });
                 }
                 catch { }

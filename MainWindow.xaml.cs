@@ -31,11 +31,17 @@ public partial class MainWindow : Window
     [DllImport("user32.dll")] private static extern bool SetForegroundWindow(IntPtr hWnd);
     [DllImport("user32.dll")] private static extern bool ShowWindow(IntPtr hWnd, int command);
     [DllImport("user32.dll")] private static extern bool DestroyIcon(IntPtr handle);
+    [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr window, out uint processId);
 
     private readonly AppSettings _settings = AppSettings.Load();
     private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromSeconds(2) };
     private readonly Forms.NotifyIcon _tray;
     private readonly Dictionary<string, bool> _groupExpansionState = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<int, bool> _processExpansionState = new();
+    private readonly Dictionary<int, double> _previousCpuByPid = new();
+    private readonly Dictionary<int, long> _previousWorkingSetByPid = new();
+    private readonly Dictionary<string, TabProcessAssociation> _tabAssociations = new(StringComparer.Ordinal);
     private bool _tabsSectionExpanded;
     private bool _firefoxContentExpanded;
     private MemoryReading? _reading;
@@ -169,6 +175,7 @@ public partial class MainWindow : Window
         {
             var result = await Task.Run(() => (Rows: MemoryProbe.ReadProcesses(), Tabs: MemoryProbe.ReadFirefoxTabs()));
             var rows = result.Rows;
+            UpdateFirefoxAssociations(rows, result.Tabs);
             var groups = rows
                 .Where(p => p.PrivateBytes > 0 && p.Pid != Environment.ProcessId)
                 .GroupBy(p => p.DisplayName, StringComparer.OrdinalIgnoreCase)
@@ -221,6 +228,69 @@ public partial class MainWindow : Window
         return new ProcessGroup { Name = "Windows, cache & shared", Processes = items, IsSystemEstimate = true };
     }
 
+    private void UpdateFirefoxAssociations(List<ProcessSnapshot> rows, FirefoxTabsSnapshot tabsSnapshot)
+    {
+        var firefox = rows.Where(process => process.DisplayName.Equals("Firefox", StringComparison.OrdinalIgnoreCase)).ToList();
+        var content = firefox.Where(process => process.Role.StartsWith("web content", StringComparison.OrdinalIgnoreCase)).ToList();
+        var now = DateTime.UtcNow;
+        GetWindowThreadProcessId(GetForegroundWindow(), out var foregroundPid);
+        var firefoxIsForeground = firefox.Any(process => process.Pid == foregroundPid && !process.CommandLine.Contains("-contentproc", StringComparison.OrdinalIgnoreCase));
+        var activeTitle = firefox
+            .Where(process => !process.CommandLine.Contains("-contentproc", StringComparison.OrdinalIgnoreCase))
+            .Select(process => CleanFirefoxTitle(process.WindowTitle))
+            .FirstOrDefault(title => !string.IsNullOrWhiteSpace(title)) ?? "";
+        var activeTab = tabsSnapshot.Tabs.FirstOrDefault(tab => TitlesMatch(tab.Title, activeTitle));
+
+        if (firefoxIsForeground && activeTab is not null && content.Count > 0)
+        {
+            var scored = content.Select(process =>
+            {
+                var cpuDelta = _previousCpuByPid.TryGetValue(process.Pid, out var previousCpu)
+                    ? Math.Max(0, process.CpuTotalMilliseconds - previousCpu) : 0;
+                var workingSetDeltaMb = _previousWorkingSetByPid.TryGetValue(process.Pid, out var previousWorkingSet)
+                    ? Math.Max(0, process.WorkingSetBytes - previousWorkingSet) / 1048576d : 0;
+                return (Process: process, Score: cpuDelta + workingSetDeltaMb * 1.4);
+            }).OrderByDescending(item => item.Score).ToList();
+
+            var top = scored[0];
+            var secondScore = scored.Count > 1 ? scored[1].Score : 0;
+            if (top.Score >= 4)
+            {
+                var separation = 1 - Math.Min(1, secondScore / Math.Max(1, top.Score));
+                var confidence = Math.Clamp(0.45 + separation * 0.35 + Math.Min(0.18, top.Score / 500), 0.45, 0.96);
+                var key = TabKey(activeTab);
+                if (!_tabAssociations.TryGetValue(key, out var association))
+                {
+                    association = new TabProcessAssociation { Key = key };
+                    _tabAssociations[key] = association;
+                }
+                if (association.Pid != 0 && association.Pid != top.Process.Pid)
+                {
+                    association.PreviousPid = association.Pid;
+                    association.DriftDetectedUtc = now;
+                }
+                association.Pid = top.Process.Pid;
+                association.ObservedUtc = now;
+                association.Confidence = confidence;
+            }
+        }
+
+        foreach (var process in content)
+        {
+            _previousCpuByPid[process.Pid] = process.CpuTotalMilliseconds;
+            _previousWorkingSetByPid[process.Pid] = process.WorkingSetBytes;
+        }
+        var livePids = content.Select(process => process.Pid).ToHashSet();
+        foreach (var pid in _previousCpuByPid.Keys.Where(pid => !livePids.Contains(pid)).ToList())
+        {
+            _previousCpuByPid.Remove(pid);
+            _previousWorkingSetByPid.Remove(pid);
+        }
+        var currentKeys = tabsSnapshot.Tabs.Select(TabKey).ToHashSet(StringComparer.Ordinal);
+        foreach (var key in _tabAssociations.Where(item => !currentKeys.Contains(item.Key) && now - item.Value.ObservedUtc > TimeSpan.FromHours(1)).Select(item => item.Key).ToList())
+            _tabAssociations.Remove(key);
+    }
+
     private void PopulateTree(List<ProcessGroup> groups, FirefoxTabsSnapshot firefoxTabs)
     {
         foreach (var item in ProcessTree.Items.OfType<TreeViewItem>().Where(item => item.Tag is ProcessGroup))
@@ -233,7 +303,10 @@ public partial class MainWindow : Window
                 {
                     _firefoxContentExpanded = child.IsExpanded;
                     foreach (var grandchild in child.Items.OfType<TreeViewItem>())
+                    {
                         if (grandchild.Tag is FirefoxTabSection) _tabsSectionExpanded = grandchild.IsExpanded;
+                        if (grandchild.Tag is ProcessSnapshot process && !process.IsSynthetic) _processExpansionState[process.Pid] = grandchild.IsExpanded;
+                    }
                 }
             }
         }
@@ -250,39 +323,63 @@ public partial class MainWindow : Window
                     group.IsFirefox,
                     group.IsSystemEstimate
                         ? "Estimated RAM not present in the summed process working sets below. Expand for cache, kernel pools, and the remaining shared/OS category. Process working sets can overlap, so this is a reconciliation estimate rather than exact ownership."
-                        : "Total private committed memory for the processes in this app group."),
+                        : "Total private committed memory for the processes in this app group.",
+                    depth: 0),
                 Tag = group,
                 IsExpanded = _groupExpansionState.TryGetValue(group.Name, out var wasExpanded) ? wasExpanded : group.IsFirefox || group.IsSystemEstimate
             };
             if (group.IsFirefox)
             {
                 var webContent = group.Processes.Where(process => process.Role.StartsWith("web content", StringComparison.OrdinalIgnoreCase)).ToList();
-                foreach (var process in group.Processes.Except(webContent)) root.Items.Add(MakeProcessTreeItem(process, true));
+                foreach (var process in group.Processes.Except(webContent)) root.Items.Add(MakeProcessTreeItem(process, true, rowDepth: 1));
                 var contentSection = new TreeViewItem
                 {
                     Header = MakeRow("Web content", $"{webContent.Count} Firefox content processes", FormatBytes(webContent.Sum(process => process.PrivateBytes)), true,
-                        "Firefox may host multiple tabs in one content process and may move a tab after navigation or isolation changes. Expand for the separate title snapshot and the current Windows content PIDs."),
+                        "Firefox may host multiple tabs in one content process and may move a tab after navigation or isolation changes. Tab associations below are inferred from foreground-title changes and short CPU/working-set activity bursts.",
+                        depth: 1),
                     Tag = new FirefoxContentSection("Web content"),
                     IsExpanded = _firefoxContentExpanded
                 };
-                contentSection.Items.Add(MakeFirefoxTabsSection(group, firefoxTabs));
-                foreach (var process in webContent) contentSection.Items.Add(MakeProcessTreeItem(process, true));
+                var tabsByPid = firefoxTabs.Tabs
+                    .Select(tab => (Tab: tab, Association: _tabAssociations.GetValueOrDefault(TabKey(tab))))
+                    .Where(item => item.Association is not null && webContent.Any(process => process.Pid == item.Association.Pid))
+                    .GroupBy(item => item.Association!.Pid)
+                    .ToDictionary(grouped => grouped.Key, grouped => grouped.ToList());
+                foreach (var process in webContent)
+                {
+                    tabsByPid.TryGetValue(process.Pid, out var associatedTabs);
+                    contentSection.Items.Add(MakeProcessTreeItem(process, true, associatedTabs, firefoxTabs, rowDepth: 2));
+                }
+                var unresolved = firefoxTabs.Tabs.Where(tab =>
+                {
+                    var association = _tabAssociations.GetValueOrDefault(TabKey(tab));
+                    return association is null || webContent.All(process => process.Pid != association.Pid);
+                }).ToList();
+                contentSection.Items.Add(MakeUnresolvedTabsSection(group, firefoxTabs, unresolved));
                 root.Items.Add(contentSection);
             }
             else
             {
-                foreach (var process in group.Processes) root.Items.Add(MakeProcessTreeItem(process, false));
+                foreach (var process in group.Processes) root.Items.Add(MakeProcessTreeItem(process, false, rowDepth: 1));
             }
             ProcessTree.Items.Add(root);
         }
         LoadingText.Visibility = Visibility.Collapsed;
     }
 
-    private TreeViewItem MakeProcessTreeItem(ProcessSnapshot process, bool firefox)
+    private TreeViewItem MakeProcessTreeItem(
+        ProcessSnapshot process,
+        bool firefox,
+        List<(FirefoxTabSnapshot Tab, TabProcessAssociation? Association)>? associatedTabs = null,
+        FirefoxTabsSnapshot? snapshot = null,
+        int rowDepth = 1)
     {
         var descriptor = process.Role;
         if (!string.IsNullOrWhiteSpace(process.WindowTitle) && process.Role == process.WindowTitle)
             descriptor = Trim(process.WindowTitle, 42);
+        var tabCount = associatedTabs?.Count ?? 0;
+        if (firefox && process.Role.StartsWith("web content", StringComparison.OrdinalIgnoreCase))
+            descriptor += $" · {tabCount} inferred tab{(tabCount == 1 ? "" : "s")}";
         var child = new TreeViewItem
         {
             Header = MakeRow(
@@ -292,15 +389,35 @@ public partial class MainWindow : Window
                 firefox,
                 process.IsSynthetic
                     ? process.Tooltip
-                    : $"Private committed memory: {FormatBytes(process.PrivateBytes)}. Current physical working set: {FormatBytes(process.WorkingSetBytes)}. {process.Role}"),
+                    : $"Private committed memory: {FormatBytes(process.PrivateBytes)}. Current physical working set: {FormatBytes(process.WorkingSetBytes)}. {process.Role}",
+                depth: rowDepth),
             Tag = process,
-            ToolTip = process.Tooltip
+            ToolTip = process.Tooltip,
+            IsExpanded = _processExpansionState.GetValueOrDefault(process.Pid)
         };
         if (!process.IsSynthetic) child.ContextMenu = MakeProcessMenu(process);
+        if (firefox && process.Role.StartsWith("web content", StringComparison.OrdinalIgnoreCase))
+        {
+            if (associatedTabs is null || associatedTabs.Count == 0)
+            {
+                child.Items.Add(new TreeViewItem
+                {
+                    Header = MakeRow("No confident tab match yet", "activate or interact with a Firefox tab to sample it", "", false,
+                        "Memory Bloom waits for a distinguishable foreground activity burst instead of guessing. This row will update as tabs are observed.",
+                        depth: rowDepth + 1),
+                    IsEnabled = false
+                });
+            }
+            else
+            {
+                foreach (var item in associatedTabs.OrderByDescending(item => item.Tab.LastAccessedUtc))
+                    child.Items.Add(MakeAssociatedTabItem(item.Tab, item.Association!, snapshot!));
+            }
+        }
         return child;
     }
 
-    private TreeViewItem MakeFirefoxTabsSection(ProcessGroup firefoxGroup, FirefoxTabsSnapshot snapshot)
+    private TreeViewItem MakeUnresolvedTabsSection(ProcessGroup firefoxGroup, FirefoxTabsSnapshot snapshot, List<FirefoxTabSnapshot> unresolved)
     {
         var sourceAge = snapshot.SourceTimeUtc == default ? TimeSpan.Zero : DateTime.UtcNow - snapshot.SourceTimeUtc;
         var mainTitle = firefoxGroup.Processes
@@ -316,45 +433,97 @@ public partial class MainWindow : Window
             : $"snapshot {FormatAge(sourceAge)} old{(activeTitleMatches ? "" : " · active title differs")}";
         var section = new TreeViewItem
         {
-            Header = MakeRow("Known tabs", freshness, $"{snapshot.Tabs.Count}", true,
-                "Tab titles and last-interaction times read from Firefox's local recovery snapshot. They are intentionally separate because Firefox does not expose a stable tab-to-Windows-PID mapping. A differing active title or an old snapshot is flagged here."),
-            Tag = new FirefoxTabSection("Known tabs"),
+            Header = MakeRow("Unresolved tabs", freshness, $"{unresolved.Count}", true,
+                "Tabs that have not yet produced a confident process-activity match, or whose last matched PID has disappeared. They remain unresolved rather than being assigned arbitrarily.",
+                depth: 2),
+            Tag = new FirefoxTabSection("Unresolved tabs"),
             IsExpanded = _tabsSectionExpanded
         };
         if (snapshot.Error is not null)
         {
-            section.Items.Add(new TreeViewItem { Header = MakeRow("Unavailable", snapshot.Error, "", false, snapshot.Error), IsEnabled = false });
+            section.Items.Add(new TreeViewItem { Header = MakeRow("Unavailable", snapshot.Error, "", false, snapshot.Error, depth: 3), IsEnabled = false });
             return section;
         }
-        foreach (var tab in snapshot.Tabs.Take(250))
+        foreach (var tab in unresolved.Take(250))
         {
             var age = DateTime.UtcNow - tab.LastAccessedUtc;
             var subtitle = $"last used {FormatAge(age)} ago{(tab.Hidden ? " · hidden" : "")}";
             section.Items.Add(new TreeViewItem
             {
-                Header = MakeRow(Trim(tab.Title, 36), subtitle, "", true, $"{tab.Title}\n{tab.Url}\nLast interacted: {tab.LastAccessedUtc.ToLocalTime():g}"),
+                Header = MakeTabRow(tab.Title, subtitle, $"{tab.Title}\n{tab.Url}\nLast interacted: {tab.LastAccessedUtc.ToLocalTime():g}\nNo current PID association.", false, depth: 3),
                 Tag = tab
             });
         }
-        if (snapshot.Tabs.Count > 250)
-            section.Items.Add(new TreeViewItem { Header = MakeRow("More tabs not shown", $"{snapshot.Tabs.Count - 250} additional titles", "", false, "The display is capped at 250 titles to keep the process tree responsive."), IsEnabled = false });
+        if (unresolved.Count > 250)
+            section.Items.Add(new TreeViewItem { Header = MakeTabRow("More tabs not shown", $"{unresolved.Count - 250} additional titles", "The display is capped at 250 titles to keep the process tree responsive.", false, depth: 3), IsEnabled = false });
         return section;
     }
 
-    private static Grid MakeRow(string title, string subtitle, string memory, bool accent, string tooltip)
+    private TreeViewItem MakeAssociatedTabItem(FirefoxTabSnapshot tab, TabProcessAssociation association, FirefoxTabsSnapshot snapshot)
     {
-        var grid = new Grid { MinWidth = 565, Margin = new Thickness(2, 2, 3, 2) };
+        var observationAge = DateTime.UtcNow - association.ObservedUtc;
+        var sourceAge = snapshot.SourceTimeUtc == default ? TimeSpan.MaxValue : DateTime.UtcNow - snapshot.SourceTimeUtc;
+        var driftRecent = association.DriftDetectedUtc is not null && DateTime.UtcNow - association.DriftDetectedUtc < TimeSpan.FromMinutes(10);
+        var warning = observationAge > TimeSpan.FromMinutes(5) || sourceAge > TimeSpan.FromMinutes(2) || association.Confidence < 0.60 || driftRecent;
+        var status = driftRecent
+            ? $"moved from PID {association.PreviousPid} · seen {FormatAge(observationAge)} ago"
+            : $"match {association.Confidence:P0} · seen {FormatAge(observationAge)} ago · last used {FormatAge(DateTime.UtcNow - tab.LastAccessedUtc)} ago";
+        return new TreeViewItem
+        {
+            Header = MakeTabRow(tab.Title, status,
+                $"{tab.Title}\n{tab.Url}\nInferred PID: {association.Pid}\nConfidence: {association.Confidence:P0}\nObserved: {association.ObservedUtc.ToLocalTime():g}\nFirefox snapshot: {snapshot.SourceTimeUtc.ToLocalTime():g}", warning, depth: 3),
+            Tag = tab
+        };
+    }
+
+    private static Grid MakeRow(string title, string subtitle, string memory, bool accent, string tooltip, bool warning = false, int depth = 0)
+    {
+        var grid = new Grid { Width = Math.Max(560, 680 - depth * 18), Margin = new Thickness(2, 2, 3, 2) };
         grid.ToolTip = tooltip;
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(185) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(285) });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(90) });
-        var a = new TextBlock { Text = title, FontWeight = FontWeights.SemiBold, Foreground = accent ? new SolidColorBrush(Color.FromRgb(117, 214, 178)) : Brushes.WhiteSmoke };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(85) });
+        var titleColor = warning ? Color.FromRgb(230, 190, 92) : accent ? Color.FromRgb(117, 214, 178) : Color.FromRgb(240, 244, 245);
+        var a = new TextBlock { Text = title, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(titleColor), TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 0, 10, 0) };
         var b = new TextBlock { Text = subtitle, Foreground = new SolidColorBrush(Color.FromRgb(168, 182, 186)), TextTrimming = TextTrimming.CharacterEllipsis };
         var c = new TextBlock { Text = memory, Foreground = Brushes.WhiteSmoke, HorizontalAlignment = HorizontalAlignment.Right };
         Grid.SetColumn(a, 0); Grid.SetColumn(b, 1); Grid.SetColumn(c, 2);
         grid.Children.Add(a); grid.Children.Add(b); grid.Children.Add(c);
         return grid;
     }
+
+    private static Grid MakeTabRow(string title, string status, string tooltip, bool warning, int depth)
+    {
+        var grid = new Grid { Width = Math.Max(560, 680 - depth * 18), Margin = new Thickness(2, 3, 3, 3), ToolTip = tooltip };
+        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        var titleColor = warning ? Color.FromRgb(230, 190, 92) : Color.FromRgb(117, 214, 178);
+        var titleBlock = new TextBlock
+        {
+            Text = title,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = new SolidColorBrush(titleColor),
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            Margin = new Thickness(0, 0, 8, 0)
+        };
+        var statusBlock = new TextBlock
+        {
+            Text = status,
+            Foreground = new SolidColorBrush(warning ? Color.FromRgb(218, 184, 105) : Color.FromRgb(168, 182, 186)),
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            Margin = new Thickness(12, 1, 8, 0),
+            FontSize = 11
+        };
+        Grid.SetRow(statusBlock, 1);
+        grid.Children.Add(titleBlock);
+        grid.Children.Add(statusBlock);
+        return grid;
+    }
+
+    private static string TabKey(FirefoxTabSnapshot tab) => $"{tab.Url}\n{tab.Title}";
+    private static string CleanFirefoxTitle(string title) => System.Text.RegularExpressions.Regex.Replace(title ?? "", @"\s*[—-]\s*Mozilla Firefox\s*$", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase).Trim();
+    private static bool TitlesMatch(string left, string right) => !string.IsNullOrWhiteSpace(left) && !string.IsNullOrWhiteSpace(right) &&
+        (left.Equals(right, StringComparison.OrdinalIgnoreCase) || left.Contains(right, StringComparison.OrdinalIgnoreCase) || right.Contains(left, StringComparison.OrdinalIgnoreCase));
 
     private void ShowDetails()
     {
@@ -365,7 +534,7 @@ public partial class MainWindow : Window
         Shell.LayoutTransform = Transform.Identity;
         Topmost = false;
         ResizeMode = ResizeMode.CanResizeWithGrip;
-        MinWidth = 650;
+        MinWidth = 760;
         MinHeight = 430;
         Width = Math.Max(780, Width);
         Height = Math.Max(600, Height);
@@ -661,23 +830,36 @@ public partial class MainWindow : Window
                 await Task.Delay(75);
             if (ProcessTree.Items.Count == 0)
                 await RefreshProcessesAsync();
+            TreeViewItem? previewProcess = null;
             TreeViewItem? previewTabsSection = null;
+            TreeViewItem? previewTab = null;
             var firefoxRoot = ProcessTree.Items.OfType<TreeViewItem>().FirstOrDefault(item => (item.Tag as ProcessGroup)?.IsFirefox == true);
             var contentSection = firefoxRoot?.Items.OfType<TreeViewItem>().FirstOrDefault(item => item.Tag is FirefoxContentSection);
             if (contentSection is not null)
             {
                 contentSection.IsExpanded = true;
+                previewProcess = contentSection.Items.OfType<TreeViewItem>().FirstOrDefault(item => item.Tag is ProcessSnapshot);
+                if (previewProcess is not null) previewProcess.IsExpanded = true;
                 var tabsSection = contentSection.Items.OfType<TreeViewItem>().FirstOrDefault(item => item.Tag is FirefoxTabSection);
                 if (tabsSection is not null)
                 {
                     tabsSection.IsExpanded = true;
                     previewTabsSection = tabsSection;
+                    previewTab = tabsSection.Items.OfType<TreeViewItem>().FirstOrDefault();
                 }
             }
             UpdateLayout();
-            previewTabsSection?.BringIntoView();
+            firefoxRoot?.BringIntoView();
             UpdateLayout();
             SaveVisual(System.IO.Path.Combine(folder, "detailed.png"));
+
+            (previewProcess?.Items.OfType<TreeViewItem>().FirstOrDefault() ?? previewProcess)?.BringIntoView();
+            UpdateLayout();
+            SaveVisual(System.IO.Path.Combine(folder, "firefox-processes.png"));
+
+            (previewTab ?? previewTabsSection)?.BringIntoView();
+            UpdateLayout();
+            SaveVisual(System.IO.Path.Combine(folder, "firefox-tabs.png"));
 
             ShowMinimal(manual: true);
             UpdateLayout();
