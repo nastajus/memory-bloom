@@ -31,7 +31,11 @@ public partial class App : System.Windows.Application
         base.OnStartup(e);
         var window = new MainWindow();
         MainWindow = window;
-        window.InitializeInBackground(e.Args.Contains("--show", StringComparer.OrdinalIgnoreCase) || previewFolder is not null, previewFolder);
+        var showPassive = e.Args.Contains("--show-passive", StringComparer.OrdinalIgnoreCase);
+        window.InitializeInBackground(
+            e.Args.Contains("--show", StringComparer.OrdinalIgnoreCase) || showPassive || previewFolder is not null,
+            previewFolder,
+            activateInitial: !showPassive && previewFolder is null);
     }
 
     protected override void OnExit(ExitEventArgs e)

@@ -35,10 +35,11 @@ public partial class MainWindow : Window
     [DllImport("user32.dll")] private static extern bool ReleaseCapture();
     [DllImport("user32.dll")] private static extern IntPtr SendMessage(IntPtr window, uint message, IntPtr wordParameter, IntPtr longParameter);
     [DllImport("user32.dll")] private static extern bool GetWindowRect(IntPtr window, out NativeRect rectangle);
+    [DllImport("user32.dll")] private static extern uint GetDpiForWindow(IntPtr window);
+    [DllImport("user32.dll")] private static extern bool IsWindow(IntPtr window);
     [DllImport("user32.dll")] private static extern int SetWindowRgn(IntPtr window, IntPtr region, bool redraw);
     [DllImport("gdi32.dll")] private static extern IntPtr CreateRoundRectRgn(int left, int top, int right, int bottom, int ellipseWidth, int ellipseHeight);
     [DllImport("gdi32.dll")] private static extern bool DeleteObject(IntPtr value);
-    [DllImport("dwmapi.dll")] private static extern int DwmSetWindowAttribute(IntPtr window, int attribute, ref int value, int valueSize);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct NativeRect
@@ -50,6 +51,7 @@ public partial class MainWindow : Window
     }
 
     private const uint WmNcLButtonDown = 0x00A1;
+    private static readonly TimeSpan CurrentAssociationLifetime = TimeSpan.FromMinutes(2);
     private static readonly IntPtr HtCaption = new(2);
 
     private readonly AppSettings _settings = AppSettings.Load();
@@ -64,6 +66,8 @@ public partial class MainWindow : Window
     private readonly Dictionary<string, Dictionary<int, double>> _tabActivityEvidence = new(StringComparer.Ordinal);
     private readonly Dictionary<string, DateTime> _liveTabAccess = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _liveTabTitles = new(StringComparer.Ordinal);
+    private readonly Dictionary<IntPtr, string> _liveTitleKeyByWindow = new();
+    private readonly Dictionary<string, DateTime> _supersededLiveTitleKeys = new(StringComparer.Ordinal);
     private readonly HashSet<int> _latestFirefoxTabHostPids = new();
     private List<ProcessGroup> _latestGroups = new();
     private FirefoxTabsSnapshot _firefoxSessionTabs = new();
@@ -86,6 +90,12 @@ public partial class MainWindow : Window
     private bool _surfacePointerDown;
     private bool _surfaceDragging;
     private Point _pointerStartScreen;
+    private bool _hasCompactAnchor;
+    private bool _compactAnchoredRight;
+    private double _compactLeft;
+    private double _compactRight;
+    private double _compactTop;
+    private Rect _compactWorkArea;
 
     public MainWindow()
     {
@@ -125,13 +135,17 @@ public partial class MainWindow : Window
         MouseWheel += MainWindow_MouseWheel;
     }
 
-    public void InitializeInBackground(bool showNow, string? previewFolder = null)
+    public void InitializeInBackground(bool showNow, string? previewFolder = null, bool activateInitial = true)
     {
         if (previewFolder is not null)
             Loaded += async (_, _) => await CapturePreviewsAsync(previewFolder);
+        ShowActivated = activateInitial;
+        SetMinimalSize();
+        PositionAtEdgeIfNeeded();
         Show();
-        if (showNow) ShowDetails();
+        if (showNow) ShowDetails(activateInitial);
         else Hide();
+        ShowActivated = true;
         _ready = true;
         _timer.Start();
         _firefoxTimer.Start();
@@ -227,7 +241,7 @@ public partial class MainWindow : Window
             _latestFirefoxTabHostPids.Clear();
             foreach (var process in firefoxTabHosts) _latestFirefoxTabHostPids.Add(process.Pid);
             var foreground = GetForegroundFirefoxTitle();
-            ObserveLiveFirefoxTab(foreground.IsForeground, foreground.Title);
+            ObserveLiveFirefoxTab(foreground.IsForeground, foreground.Title, foreground.Window);
             var mergedTabs = MergeFirefoxTabs(_firefoxSessionTabs);
             UpdateFirefoxAssociations(
                 firefoxTabHosts.Select(process => new ProcessActivity(process.Pid, process.CpuTotalMilliseconds, process.WorkingSetBytes)).ToList(),
@@ -290,7 +304,7 @@ public partial class MainWindow : Window
 
     private void ResetFirefoxObservationsForNewSession(int browserPid)
     {
-        if (_firefoxBrowserPid != 0 && browserPid != 0 && browserPid != _firefoxBrowserPid)
+        if (_firefoxBrowserPid != 0 && browserPid != _firefoxBrowserPid)
         {
             _previousCpuByPid.Clear();
             _previousWorkingSetByPid.Clear();
@@ -298,6 +312,8 @@ public partial class MainWindow : Window
             _tabActivityEvidence.Clear();
             _liveTabAccess.Clear();
             _liveTabTitles.Clear();
+            _liveTitleKeyByWindow.Clear();
+            _supersededLiveTitleKeys.Clear();
             _lastForegroundFirefoxTitle = "";
         }
         _firefoxBrowserPid = browserPid;
@@ -324,7 +340,7 @@ public partial class MainWindow : Window
     {
         if (!_detailed || _latestFirefoxTabHostPids.Count == 0) return;
         var foreground = GetForegroundFirefoxTitle();
-        var liveChanged = ObserveLiveFirefoxTab(foreground.IsForeground, foreground.Title);
+        var liveChanged = ObserveLiveFirefoxTab(foreground.IsForeground, foreground.Title, foreground.Window);
         var mergedTabs = MergeFirefoxTabs(_firefoxSessionTabs);
         var associationChanged = UpdateFirefoxAssociations(
             MemoryProbe.ReadProcessActivity(_latestFirefoxTabHostPids),
@@ -338,22 +354,23 @@ public partial class MainWindow : Window
         }
     }
 
-    private (bool IsForeground, string Title) GetForegroundFirefoxTitle()
+    private (bool IsForeground, string Title, IntPtr Window) GetForegroundFirefoxTitle()
     {
         try
         {
-            GetWindowThreadProcessId(GetForegroundWindow(), out var foregroundPid);
+            var window = GetForegroundWindow();
+            GetWindowThreadProcessId(window, out var foregroundPid);
             using var foreground = Process.GetProcessById((int)foregroundPid);
-            if (!foreground.ProcessName.Equals("firefox", StringComparison.OrdinalIgnoreCase)) return (false, "");
-            return (true, CleanFirefoxTitle(foreground.MainWindowTitle));
+            if (!foreground.ProcessName.Equals("firefox", StringComparison.OrdinalIgnoreCase)) return (false, "", IntPtr.Zero);
+            return (true, CleanFirefoxTitle(foreground.MainWindowTitle), window);
         }
         catch
         {
-            return (false, "");
+            return (false, "", IntPtr.Zero);
         }
     }
 
-    private bool ObserveLiveFirefoxTab(bool firefoxIsForeground, string activeTitle)
+    private bool ObserveLiveFirefoxTab(bool firefoxIsForeground, string activeTitle, IntPtr window)
     {
         if (!firefoxIsForeground || string.IsNullOrWhiteSpace(activeTitle))
         {
@@ -366,8 +383,18 @@ public partial class MainWindow : Window
         var titleChanged = !_lastForegroundFirefoxTitle.Equals(normalized, StringComparison.Ordinal);
         if (titleChanged)
         {
+            if (window != IntPtr.Zero && _liveTitleKeyByWindow.TryGetValue(window, out var previousKey) && !previousKey.Equals(normalized, StringComparison.Ordinal))
+            {
+                _liveTabAccess.Remove(previousKey);
+                _liveTabTitles.Remove(previousKey);
+                _tabAssociations.Remove(previousKey);
+                _tabActivityEvidence.Remove(previousKey);
+                _supersededLiveTitleKeys[previousKey] = DateTime.UtcNow;
+            }
+            _supersededLiveTitleKeys.Remove(normalized);
             _liveTabAccess[normalized] = DateTime.UtcNow;
             _liveTabTitles[normalized] = activeTitle;
+            if (window != IntPtr.Zero) _liveTitleKeyByWindow[window] = normalized;
         }
         _lastForegroundFirefoxTitle = normalized;
         return titleChanged;
@@ -376,13 +403,19 @@ public partial class MainWindow : Window
     private FirefoxTabsSnapshot MergeFirefoxTabs(FirefoxTabsSnapshot snapshot)
     {
         var now = DateTime.UtcNow;
-        foreach (var key in _liveTabAccess.Where(item => now - item.Value > TimeSpan.FromHours(12)).Select(item => item.Key).ToList())
+        foreach (var window in _liveTitleKeyByWindow.Keys.Where(window => !IsWindow(window)).ToList())
+            _liveTitleKeyByWindow.Remove(window);
+        foreach (var key in _liveTabAccess.Where(item => now - item.Value > TimeSpan.FromMinutes(10)).Select(item => item.Key).ToList())
         {
             _liveTabAccess.Remove(key);
             _liveTabTitles.Remove(key);
+            foreach (var window in _liveTitleKeyByWindow.Where(item => item.Value.Equals(key, StringComparison.Ordinal)).Select(item => item.Key).ToList())
+                _liveTitleKeyByWindow.Remove(window);
         }
 
-        var tabs = snapshot.Tabs.ToList();
+        foreach (var key in _supersededLiveTitleKeys.Where(item => snapshot.SourceTimeUtc >= item.Value).Select(item => item.Key).ToList())
+            _supersededLiveTitleKeys.Remove(key);
+        var tabs = snapshot.Tabs.Where(tab => !_supersededLiveTitleKeys.ContainsKey(NormalizeTitle(tab.Title))).ToList();
         foreach (var observed in _liveTabAccess)
         {
             var index = tabs.FindIndex(tab => NormalizeTitle(tab.Title).Equals(observed.Key, StringComparison.Ordinal));
@@ -527,11 +560,11 @@ public partial class MainWindow : Window
             };
             if (group.IsFirefox)
             {
-                var tabHosts = group.Processes.Where(IsFirefoxTabHost).ToList();
-                foreach (var process in group.Processes.Except(tabHosts)) root.Items.Add(MakeProcessTreeItem(process, true, rowDepth: 1));
+                var tabHosts = OrderProcessesByMemory(group.Processes.Where(IsFirefoxTabHost)).ToList();
+                foreach (var process in OrderProcessesByMemory(group.Processes.Except(tabHosts))) root.Items.Add(MakeProcessTreeItem(process, true, rowDepth: 1));
                 var tabsByPid = firefoxTabs.Tabs
                     .Select(tab => (Tab: tab, Association: _tabAssociations.GetValueOrDefault(TabKey(tab))))
-                    .Where(item => item.Association is not null && tabHosts.Any(process => process.Pid == item.Association.Pid))
+                    .Where(item => item.Association is not null && IsAssociationCurrent(item.Association) && tabHosts.Any(process => process.Pid == item.Association.Pid))
                     .GroupBy(item => item.Association!.Pid)
                     .ToDictionary(grouped => grouped.Key, grouped => grouped.ToList());
                 var observedLinks = tabsByPid.Sum(item => item.Value.Count);
@@ -551,19 +584,25 @@ public partial class MainWindow : Window
                 var unresolved = firefoxTabs.Tabs.Where(tab =>
                 {
                     var association = _tabAssociations.GetValueOrDefault(TabKey(tab));
-                    return association is null || tabHosts.All(process => process.Pid != association.Pid);
+                    return association is null || !IsAssociationCurrent(association) || tabHosts.All(process => process.Pid != association.Pid);
                 }).ToList();
                 contentSection.Items.Add(MakeUnresolvedTabsSection(group, firefoxTabs, unresolved));
                 root.Items.Add(contentSection);
             }
             else
             {
-                foreach (var process in group.Processes) root.Items.Add(MakeProcessTreeItem(process, false, rowDepth: 1));
+                foreach (var process in OrderProcessesByMemory(group.Processes)) root.Items.Add(MakeProcessTreeItem(process, false, rowDepth: 1));
             }
             ProcessTree.Items.Add(root);
         }
         LoadingText.Visibility = Visibility.Collapsed;
     }
+
+    private static IOrderedEnumerable<ProcessSnapshot> OrderProcessesByMemory(IEnumerable<ProcessSnapshot> processes) =>
+        processes.OrderByDescending(process => process.PrivateBytes).ThenBy(process => process.Pid);
+
+    private static bool IsAssociationCurrent(TabProcessAssociation association) =>
+        DateTime.UtcNow - association.ObservedUtc <= CurrentAssociationLifetime;
 
     private TreeViewItem MakeProcessTreeItem(
         ProcessSnapshot process,
@@ -645,10 +684,18 @@ public partial class MainWindow : Window
         foreach (var tab in unresolved.Take(250))
         {
             var age = DateTime.UtcNow - tab.LastAccessedUtc;
-            var subtitle = $"last used {FormatAge(age)} ago{(tab.Hidden ? " · hidden" : "")}";
+            var association = _tabAssociations.GetValueOrDefault(TabKey(tab));
+            var associationAge = association is null ? TimeSpan.Zero : DateTime.UtcNow - association.ObservedUtc;
+            var stale = association is not null && !IsAssociationCurrent(association);
+            var subtitle = stale
+                ? $"last PID {association!.Pid} evidence expired · seen {FormatAge(associationAge)} ago · last used {FormatAge(age)} ago"
+                : $"Firefox snapshot · last used {FormatAge(age)} ago{(tab.Hidden ? " · hidden" : "")}";
+            var tooltip = stale
+                ? $"{tab.Title}\n{tab.Url}\nLast interacted: {tab.LastAccessedUtc.ToLocalTime():g}\nThe PID {association!.Pid} match expired because it has not been refreshed for {FormatAge(associationAge)}."
+                : $"{tab.Title}\n{tab.Url}\nLast interacted: {tab.LastAccessedUtc.ToLocalTime():g}\nNo current PID association.";
             section.Items.Add(new TreeViewItem
             {
-                Header = MakeTabRow(tab.Title, subtitle, $"{tab.Title}\n{tab.Url}\nLast interacted: {tab.LastAccessedUtc.ToLocalTime():g}\nNo current PID association.", false, depth: 3),
+                Header = MakeTabRow(tab.Title, subtitle, tooltip, stale, depth: 3),
                 Tag = tab
             });
         }
@@ -662,14 +709,16 @@ public partial class MainWindow : Window
         var observationAge = DateTime.UtcNow - association.ObservedUtc;
         var sourceAge = snapshot.SourceTimeUtc == default ? TimeSpan.MaxValue : DateTime.UtcNow - snapshot.SourceTimeUtc;
         var driftRecent = association.DriftDetectedUtc is not null && DateTime.UtcNow - association.DriftDetectedUtc < TimeSpan.FromMinutes(10);
-        var warning = observationAge > TimeSpan.FromMinutes(5) || (!tab.IsLiveObservation && sourceAge > TimeSpan.FromMinutes(2)) || association.Confidence < 0.60 || driftRecent;
+        var ageFraction = Math.Clamp(observationAge.TotalMilliseconds / CurrentAssociationLifetime.TotalMilliseconds, 0, 1);
+        var currentConfidence = association.Confidence * (1 - ageFraction * 0.50);
+        var warning = observationAge > TimeSpan.FromMinutes(1) || (!tab.IsLiveObservation && sourceAge > TimeSpan.FromMinutes(2)) || currentConfidence < 0.60 || driftRecent;
         var status = driftRecent
             ? $"moved from PID {association.PreviousPid} · seen {FormatAge(observationAge)} ago"
-            : $"{(tab.IsLiveObservation ? "live · " : "")}match {association.Confidence:P0} · seen {FormatAge(observationAge)} ago · last used {FormatAge(DateTime.UtcNow - tab.LastAccessedUtc)} ago";
+            : $"{(tab.IsLiveObservation ? "title seen live · " : "")}current confidence {currentConfidence:P0} · observed {FormatAge(observationAge)} ago · last used {FormatAge(DateTime.UtcNow - tab.LastAccessedUtc)} ago";
         return new TreeViewItem
         {
             Header = MakeTabRow(tab.Title, status,
-                $"{tab.Title}\n{tab.Url}\nInferred PID: {association.Pid}\nConfidence: {association.Confidence:P0}\nObserved: {association.ObservedUtc.ToLocalTime():g}\nFirefox snapshot: {snapshot.SourceTimeUtc.ToLocalTime():g}", warning, depth: 3),
+                $"{tab.Title}\n{tab.Url}\nInferred PID: {association.Pid}\nConfidence at observation: {association.Confidence:P0}\nCurrent age-adjusted confidence: {currentConfidence:P0}\nObserved: {association.ObservedUtc.ToLocalTime():g}\nThis placement expires after {CurrentAssociationLifetime.TotalMinutes:0} minutes without fresh evidence.\nFirefox snapshot: {snapshot.SourceTimeUtc.ToLocalTime():g}", warning, depth: 3),
             Tag = tab
         };
     }
@@ -719,17 +768,41 @@ public partial class MainWindow : Window
     }
 
     private static string TabKey(FirefoxTabSnapshot tab) => NormalizeTitle(tab.Title);
-    private static string NormalizeTitle(string title) => CleanFirefoxTitle(title).Trim().ToUpperInvariant();
+    private static string NormalizeTitle(string title)
+    {
+        var cleaned = CleanFirefoxTitle(title);
+        cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, @"\s*[—-]\s*ChatGPT\s*$", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase).Trim();
+        return cleaned.ToUpperInvariant();
+    }
     private static string CleanFirefoxTitle(string title)
     {
         var cleaned = System.Text.RegularExpressions.Regex.Replace(title ?? "", @"\s*[—-]\s*Mozilla Firefox\s*$", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase).Trim();
         return cleaned.Equals("Mozilla Firefox", StringComparison.OrdinalIgnoreCase) ? "New Tab" : cleaned;
     }
-    private static bool TitlesMatch(string left, string right) => !string.IsNullOrWhiteSpace(left) && !string.IsNullOrWhiteSpace(right) &&
-        (left.Equals(right, StringComparison.OrdinalIgnoreCase) || left.Contains(right, StringComparison.OrdinalIgnoreCase) || right.Contains(left, StringComparison.OrdinalIgnoreCase));
-
-    private void ShowDetails()
+    private static bool TitlesMatch(string left, string right)
     {
+        var normalizedLeft = NormalizeTitle(left);
+        var normalizedRight = NormalizeTitle(right);
+        return normalizedLeft.Length > 0 && normalizedRight.Length > 0 &&
+            (normalizedLeft.Equals(normalizedRight, StringComparison.Ordinal) || normalizedLeft.Contains(normalizedRight, StringComparison.Ordinal) || normalizedRight.Contains(normalizedLeft, StringComparison.Ordinal));
+    }
+
+    private void ShowDetails() => ShowDetails(activate: true);
+
+    private void ShowDetails(bool activate)
+    {
+        var enteringFromCompact = !_detailed;
+        if (enteringFromCompact)
+        {
+            _compactWorkArea = GetCurrentWorkArea();
+            var compactWidth = ActualWidth > 0 ? ActualWidth : Width;
+            _compactLeft = Left;
+            _compactRight = Left + compactWidth;
+            _compactTop = Top;
+            _compactAnchoredRight = Left + compactWidth / 2 >= _compactWorkArea.Left + _compactWorkArea.Width / 2;
+            _hasCompactAnchor = true;
+        }
+
         _manualOpen = true;
         _detailed = true;
         MinimalView.Visibility = Visibility.Collapsed;
@@ -741,10 +814,20 @@ public partial class MainWindow : Window
         MinHeight = 430;
         Width = Math.Max(780, Width);
         Height = Math.Max(600, Height);
+        if (enteringFromCompact)
+        {
+            Left = _compactAnchoredRight
+                ? Math.Max(_compactWorkArea.Left, _compactRight - Width)
+                : Math.Min(_compactLeft, _compactWorkArea.Right - Width);
+            Top = Math.Clamp(_compactTop, _compactWorkArea.Top, Math.Max(_compactWorkArea.Top, _compactWorkArea.Bottom - Height));
+        }
         _restingOpacity = 0.98;
         Opacity = IsMouseOver ? 1 : _restingOpacity;
+        ShowActivated = activate;
         Show();
-        Activate();
+        if (activate) Activate();
+        ShowActivated = true;
+        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(ApplyNativeWindowShape));
         _ = RefreshProcessesAsync();
     }
 
@@ -756,8 +839,18 @@ public partial class MainWindow : Window
         MinimalView.Visibility = Visibility.Visible;
         Topmost = true;
         SetMinimalSize();
-        PositionAtEdgeIfNeeded();
+        if (_hasCompactAnchor)
+        {
+            Left = _compactAnchoredRight ? _compactRight - Width : _compactLeft;
+            Left = Math.Clamp(Left, _compactWorkArea.Left, Math.Max(_compactWorkArea.Left, _compactWorkArea.Right - Width));
+            Top = Math.Clamp(_compactTop, _compactWorkArea.Top, Math.Max(_compactWorkArea.Top, _compactWorkArea.Bottom - Height));
+        }
+        else
+        {
+            PositionAtEdgeIfNeeded();
+        }
         Show();
+        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(ApplyNativeWindowShape));
         if (_reading is not null) UpdateMemoryVisuals(_reading);
     }
 
@@ -794,7 +887,7 @@ public partial class MainWindow : Window
 
     private void PositionAtEdgeIfNeeded(bool force = false)
     {
-        var area = SystemParameters.WorkArea;
+        var area = GetCurrentWorkArea();
         if (force || double.IsNaN(_settings.Left) || double.IsNaN(_settings.Top))
         {
             Left = area.Right - Width - 18;
@@ -805,6 +898,22 @@ public partial class MainWindow : Window
             Left = Math.Clamp(_settings.Left, area.Left, Math.Max(area.Left, area.Right - Width));
             Top = Math.Clamp(_settings.Top, area.Top, Math.Max(area.Top, area.Bottom - Height));
         }
+    }
+
+    private Rect GetCurrentWorkArea()
+    {
+        var center = new Point(
+            double.IsFinite(Left) ? Left + Math.Max(1, ActualWidth > 0 ? ActualWidth : Width) / 2 : 0,
+            double.IsFinite(Top) ? Top + Math.Max(1, ActualHeight > 0 ? ActualHeight : Height) / 2 : 0);
+        var source = PresentationSource.FromVisual(this);
+        var screenPoint = IsVisible
+            ? PointToScreen(new Point(Math.Max(1, ActualWidth) / 2, Math.Max(1, ActualHeight) / 2))
+            : (source?.CompositionTarget?.TransformToDevice ?? Matrix.Identity).Transform(center);
+        var screen = Forms.Screen.FromPoint(new Drawing.Point((int)Math.Round(screenPoint.X), (int)Math.Round(screenPoint.Y)));
+        var transform = source?.CompositionTarget?.TransformFromDevice ?? Matrix.Identity;
+        var topLeft = transform.Transform(new Point(screen.WorkingArea.Left, screen.WorkingArea.Top));
+        var bottomRight = transform.Transform(new Point(screen.WorkingArea.Right, screen.WorkingArea.Bottom));
+        return new Rect(topLeft, bottomRight);
     }
 
     private ContextMenu MakeProcessMenu(ProcessSnapshot process)
@@ -974,11 +1083,6 @@ public partial class MainWindow : Window
         var window = new WindowInteropHelper(this).Handle;
         if (window == IntPtr.Zero) return;
 
-        const int dwmWindowCornerPreference = 33;
-        const int roundCorners = 2;
-        var preference = roundCorners;
-        _ = DwmSetWindowAttribute(window, dwmWindowCornerPreference, ref preference, sizeof(int));
-
         if (WindowState == WindowState.Maximized)
         {
             _ = SetWindowRgn(window, IntPtr.Zero, true);
@@ -987,7 +1091,8 @@ public partial class MainWindow : Window
         if (!GetWindowRect(window, out var rectangle)) return;
         var width = Math.Max(1, rectangle.Right - rectangle.Left);
         var height = Math.Max(1, rectangle.Bottom - rectangle.Top);
-        var radius = _detailed ? 22 : (int)Math.Round(22 * _settings.Scale);
+        var dpiScale = Math.Max(1, GetDpiForWindow(window)) / 96d;
+        var radius = (int)Math.Round(22 * (_detailed ? 1 : _settings.Scale) * dpiScale);
         var region = CreateRoundRectRgn(0, 0, width + 1, height + 1, radius * 2, radius * 2);
         if (region == IntPtr.Zero) return;
         if (SetWindowRgn(window, region, true) == 0) DeleteObject(region);
@@ -1018,7 +1123,7 @@ public partial class MainWindow : Window
     {
         var menu = new Forms.ContextMenuStrip();
         menu.Items.Add("Show details", null, (_, _) => Dispatcher.Invoke(ShowDetails));
-        menu.Items.Add("Show minimal", null, (_, _) => Dispatcher.Invoke(() => ShowMinimal(manual: true)));
+        menu.Items.Add("Show compact", null, (_, _) => Dispatcher.Invoke(() => ShowMinimal(manual: true)));
         menu.Items.Add("Hide until pressure rises", null, (_, _) => Dispatcher.Invoke(HideUntilPressure));
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add("Exit", null, (_, _) => Dispatcher.Invoke(ExitApp));
@@ -1070,7 +1175,7 @@ public partial class MainWindow : Window
             WindowState = WindowState.Normal;
             Width = 780;
             Height = 600;
-            ShowDetails();
+            ShowDetails(activate: false);
             while (_processRefreshRunning)
                 await Task.Delay(75);
             if (ProcessTree.Items.Count == 0)

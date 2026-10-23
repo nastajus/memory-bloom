@@ -2,6 +2,25 @@
 
 Dates are reconstructed from the conversation and build artifacts where available. Early version boundaries are approximate because Git tracking was requested after development had already begun.
 
+## 0.7.0 — 2026-10-23 14:00 America/Toronto
+
+- Added a passive `--show-passive` startup path and `tools/restart-app.ps1`, which can deploy a replacement executable without taking lasting focus or leaving Memory Bloom flashing in the taskbar.
+- Made compact-to-detailed expansion monitor-aware: compact views on the right half grow leftward, views on the left half grow rightward, and collapsing restores the original compact anchor.
+- Standardized the user-facing name of the smaller mode as **Compact**.
+- Removed the independent DWM corner preference and DPI-scaled the native window region to the same 22-DIP radius as the panel, eliminating the visible double curve.
+- Tracked live Firefox titles per top-level window rather than retaining every title change for 12 hours.
+- Suppressed a superseded live title until a newer Firefox recovery snapshot can establish whether the event was same-tab navigation or a real tab switch.
+- Normalized optional `— ChatGPT` suffixes so Firefox and live-title variants of the same page merge.
+- Aged displayed association confidence and expired PID placement after two minutes without fresh evidence; expired matches move to **Unresolved tabs** with the former PID and age stated explicitly.
+- Fixed Firefox restart clearing when the sampler observes an interval with no main browser process.
+- Enforced private-memory descending order for child process rows and Firefox tab hosts, providing the same default for future browser-specific sections.
+
+The first supplied image documents the competing corner radii; the second documents historical ChatGPT titles and stale high-confidence PID placement that were incorrectly presented as current.
+
+![Reported double-corner geometry before 0.7.0](docs/screenshots/v0.7.0/reported-before-double-corners.png)
+
+![Reported stale and duplicated Firefox links before 0.7.0](docs/screenshots/v0.7.0/reported-before-stale-tab-links.png)
+
 ## 0.6.0 — 2026-10-23 13:38 America/Toronto
 
 - Reworded Firefox `tab` processes as pooled candidate hosts; they no longer imply that each PID contains one or more live tabs.

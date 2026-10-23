@@ -2,31 +2,33 @@
 
 This is the human-readable design trail. Every feature or design prompt should add a dated iteration, save new screenshots under `docs/screenshots/<version>/`, update **Current state** and **Next state**, and end with a Git commit.
 
-## Current state — 0.6.0
+## Current state — 0.7.0
 
 - Conditional pressure widget with proportional opacity/color intensity; hovering anywhere over the window temporarily makes it fully opaque.
-- Minimal and detailed modes with click-versus-drag handling, native Windows move/resize styles, and standard edge Snap/maximize previews.
+- Compact and detailed modes with click-versus-drag handling, native Windows move/resize styles, standard edge Snap/maximize previews, and monitor-aware expansion toward the available half of the screen.
 - Branded executable/window/tray icon, Alt+Tab presence, desktop shortcut, and best-effort Windows shell pinning across virtual desktops.
 - Stable collapsible process hierarchy and process actions.
 - Firefox's active title is observed live and a 500 ms lightweight sampler accumulates/decays process activity evidence, reducing typical active-tab matching from tens of seconds to the first distinguishable burst.
 - Firefox rows now distinguish candidate tab-host processes from observed tab links. Pooled processes are no longer described as proof of one or more tabs, and built-in Firefox page processes participate in matching.
-- Firefox titles are placed beneath inferred tab-host processes when foreground activity separates one candidate; unmatched titles remain in an explicit unresolved section.
+- Firefox titles are placed beneath inferred tab-host processes when foreground activity separates one candidate; unmatched titles remain in an explicit unresolved section. PID placement expires after two minutes without fresh evidence, with confidence decaying before expiry.
+- Live title changes are tracked per Firefox window, so a single-page app such as ChatGPT replaces its prior synthetic title instead of accumulating each visited view as another tab. A newer Firefox snapshot decides whether a transition was navigation or a real tab switch.
 - Restart detection clears old activity evidence, and a recovery snapshot older than the current Firefox session is suppressed instead of resurfacing closed pre-restart titles.
 - Per-tab confidence, observation age, recent process drift, and stale/uncertain yellow warnings make the probabilistic mapping visible rather than pretending it is exact.
 - Firefox process rows retain their own expanded/collapsed state, and tab titles use a full-width first line with an indented age/status line.
 - Estimated Windows/cache/kernel/shared-memory reconciliation group.
-- Memory figures again step right with parent/child hierarchy while remaining clear of the scrollbar.
+- App groups and their child PIDs—including Firefox tab hosts—sort by private memory descending, while memory figures step right with hierarchy and remain clear of the scrollbar.
 - Dark process context menus and scrollbar, with wider wrapping tooltips that reveal the complete explanation.
-- Native rounded window regions remove the opaque square corner pixels while retaining Windows resize/Snap behavior.
+- One DPI-scaled native region follows the panel's 22-DIP curve, removing the competing second corner while retaining Windows resize/Snap behavior.
+- Passive development restarts preserve the user's foreground window and avoid a flashing taskbar request for attention.
 
 Screenshots:
 
-- [Overall accounting 0.6.0](docs/screenshots/v0.6.0/detailed.png)
-- [Firefox candidate hosts 0.6.0](docs/screenshots/v0.6.0/firefox-processes.png)
-- [Firefox observed/unresolved titles 0.6.0](docs/screenshots/v0.6.0/firefox-tabs.png)
-- [Minimal 0.6.0](docs/screenshots/v0.6.0/minimal.png)
+- [Overall accounting 0.7.0](docs/screenshots/v0.7.0/detailed.png)
+- [Memory-sorted Firefox hosts 0.7.0](docs/screenshots/v0.7.0/firefox-processes.png)
+- [Current/unresolved Firefox titles 0.7.0](docs/screenshots/v0.7.0/firefox-tabs.png)
+- [Compact 0.7.0](docs/screenshots/v0.7.0/minimal.png)
 
-## Next state — 0.7.0
+## Next state — 0.8.0
 
 - Observe the 500 ms evidence sampler during normal browsing and tune its separation threshold from real ambiguous/quiet-tab cases.
 - Consider an optional signed Firefox extension/native-messaging companion for stable tab IDs, event-driven background titles, and tab actions; it still would not expose an authoritative Firefox content-process PID.
@@ -34,6 +36,22 @@ Screenshots:
 - Consider persisting recent inferred associations across app restarts with a short expiry.
 
 ## Iterations
+
+### 0.7.0 — Edge-aware expansion and expiring Firefox evidence
+
+Last state: reopening a development build could steal focus and leave its taskbar button flashing; a DPI mismatch plus DWM rounding produced a second corner outside the panel's curve; a right-aligned compact view expanded off the monitor; and live Firefox title changes accumulated for 12 hours while a six-minute-old association continued to advertise its original 95% confidence.
+
+Reported corner context: this user-supplied crop shows the narrow outer native curve competing with the broader inner panel curve. The broader 22-DIP panel curve is now the sole geometry and is converted to physical pixels for the active monitor DPI.
+
+![Reported double-corner geometry before 0.7.0](docs/screenshots/v0.7.0/reported-before-double-corners.png)
+
+Reported Firefox context: this user-supplied view shows one ChatGPT tab's changing document titles accumulated as seven links under one PID, plus six-minute-old observations retaining 94–96% labels. It motivated per-window title replacement, ChatGPT suffix normalization, confidence aging, and a two-minute placement expiry.
+
+![Reported stale and duplicated Firefox links before 0.7.0](docs/screenshots/v0.7.0/reported-before-stale-tab-links.png)
+
+Result: the compact view records which half of its current monitor it occupies and detailed mode grows inward while preserving the near edge; collapsing restores the compact position. App child PIDs sort by memory. Firefox live titles are tracked per window, same-page transitions suppress superseded titles until the next recovery snapshot distinguishes navigation from a tab switch, and unrefreshed PID evidence moves to **Unresolved tabs** after two minutes. Project restarts can deploy and show passively while restoring the previously focused window.
+
+Next state: observe tab switches versus same-tab navigation across several Firefox windows and adjust the two-minute lifetime only if real browsing shows it is too aggressive.
 
 ### 0.6.0 — Honest Firefox host status and visual polish
 
@@ -101,4 +119,5 @@ Every generated checkpoint below is retained and linked here. Version 0.2.0 pred
 - 0.4.0: [detailed](docs/screenshots/v0.4.0/detailed.png), [Firefox processes](docs/screenshots/v0.4.0/firefox-processes.png), [Firefox tabs](docs/screenshots/v0.4.0/firefox-tabs.png), [minimal](docs/screenshots/v0.4.0/minimal.png)
 - 0.5.0: [detailed](docs/screenshots/v0.5.0/detailed.png), [Firefox processes](docs/screenshots/v0.5.0/firefox-processes.png), [Firefox tabs](docs/screenshots/v0.5.0/firefox-tabs.png), [minimal](docs/screenshots/v0.5.0/minimal.png), [icon](docs/screenshots/v0.5.0/icon.png)
 - 0.6.0: [reported context](docs/screenshots/v0.6.0/reported-before-firefox-restart.png), [detailed](docs/screenshots/v0.6.0/detailed.png), [Firefox candidate hosts](docs/screenshots/v0.6.0/firefox-processes.png), [Firefox tabs](docs/screenshots/v0.6.0/firefox-tabs.png), [minimal](docs/screenshots/v0.6.0/minimal.png)
+- 0.7.0: [reported corner context](docs/screenshots/v0.7.0/reported-before-double-corners.png), [reported Firefox context](docs/screenshots/v0.7.0/reported-before-stale-tab-links.png), [detailed](docs/screenshots/v0.7.0/detailed.png), [memory-sorted Firefox hosts](docs/screenshots/v0.7.0/firefox-processes.png), [Firefox tabs](docs/screenshots/v0.7.0/firefox-tabs.png), [compact](docs/screenshots/v0.7.0/minimal.png)
 

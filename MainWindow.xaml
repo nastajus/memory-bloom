@@ -56,7 +56,7 @@
                                Margin="145,0,0,0" VerticalAlignment="Center" Visibility="Collapsed"/>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                         <Button Click="OpenFirefoxProcesses_Click" ToolTip="Open Firefox's exact tab/process view">Firefox tabs ↗</Button>
-                        <Button Click="ShowMinimal_Click" ToolTip="Return to the small view">Minimal</Button>
+                        <Button Click="ShowMinimal_Click" ToolTip="Return to the compact view">Compact</Button>
                         <Button Click="Hide_Click" ToolTip="Hide until pressure rises">×</Button>
                     </StackPanel>
                 </Grid>
