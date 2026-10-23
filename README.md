@@ -1,36 +1,79 @@
+<p align="center">
+  <img src="Assets/MemoryBloom.png" width="132" alt="Memory Bloom icon">
+</p>
+
 # Memory Bloom
 
-A quiet Windows memory-pressure companion. It runs in the notification area, stays invisible while memory is comfortable, and blooms into a translucent signal when pressure becomes important.
+Memory Bloom is a quiet Windows memory-pressure companion. It stays invisible while memory is comfortable, then blooms into a small translucent signal as physical or committed memory becomes important. Click it for a process investigator when you need to understand what is using the machine.
 
-## Everyday use
+![Memory Bloom detailed view](docs/screenshots/v0.5.0/detailed.png)
 
-- The compact view appears at 78% pressure by default and fades away below 72%.
-- Its color, glow, and window opacity strengthen as pressure rises.
-- Click the compact view—or the detailed title bar—to toggle modes. Drag either surface to move the window.
-- Select an individual process to bring its main window forward or end it (with confirmation).
-- Double-click a process to bring its window forward; right-click it for process actions.
-- Right-clicking selects that process first. Context menus and scrollbars use the app's dark theme.
-- Expand **Windows, cache & shared** for the estimated physical-memory gap outside summed process working sets, with explanations for file cache, kernel pools, and shared/OS memory.
-- Expand **Firefox → Web content** to inspect each Firefox content process. Titles with a sufficiently strong activity match appear beneath the inferred PID; other titles remain in **Unresolved tabs** rather than being guessed.
-- Yellow tab text means the match is stale, low-confidence, or was recently observed moving to another PID. Hover for the URL, confidence, and observation timestamps.
-- Use **Firefox tabs ↗** to open Firefox's authoritative `about:processes` view.
-- Use **+ / −** or Ctrl + mouse wheel to change the compact scale.
-- Double-click the tray icon or press **Ctrl+Alt+M** to show the app at any time.
-- Right-click the tray icon for Details, Hide, or Exit.
+## What it does
 
-## Build and startup
+- Appears automatically at a configurable pressure threshold and hides again with hysteresis.
+- Makes its color, glow, gauge, and whole-window opacity more intense as pressure rises.
+- Switches between a tiny minimal view and a resizable detailed process view.
+- Uses normal Windows dragging and Snap behavior, including the top-edge maximize preview.
+- Appears in Alt+Tab with its own icon and pins its window across Windows virtual desktops.
+- Preserves collapsed process branches across refreshes.
+- Brings a process window forward on double-click and offers dark right-click focus/end actions.
+- Reconciles physical RAM not represented by process working sets into file cache, kernel pools, and other shared/OS memory.
+- Starts at sign-in, lives in the notification area, and creates a desktop launcher.
+
+The compact view remains intentionally small:
+
+![Memory Bloom minimal view](docs/screenshots/v0.5.0/minimal.png)
+
+## Firefox investigation
+
+Firefox does not expose a supported, authoritative tab-to-Windows-PID mapping. Memory Bloom therefore keeps the distinction visible:
+
+- Tab titles and approximate last-accessed times come from Firefox's local recovery snapshot.
+- The foreground Firefox title is observed live, so the active title can appear immediately instead of waiting for the recovery file.
+- While the detailed view is open, a lightweight 500 ms sampler correlates foreground-title changes with short CPU and working-set bursts in Firefox content processes.
+- Repeated samples are accumulated and decayed. A title is nested beneath a process only when one candidate separates from the others.
+- Unmatched titles remain under **Unresolved tabs**. Yellow text marks a stale, uncertain, or recently changed association.
+- The **Firefox tabs ↗** button opens Firefox's authoritative `about:processes` page.
+
+![Firefox process hierarchy](docs/screenshots/v0.5.0/firefox-processes.png)
+
+![Live and unresolved Firefox titles](docs/screenshots/v0.5.0/firefox-tabs.png)
+
+Static or background tabs may remain unresolved because they do not produce a distinguishable burst. A normal Firefox extension could improve title freshness, stable tab identity, and tab actions, but Firefox's supported extension API still does not reveal the content-process PID.
+
+## Install and run
+
+Memory Bloom currently targets Windows 11 and the .NET 10 Desktop Runtime.
+
+1. Download [MemoryBloom.exe](docs/releases/v0.5.0/MemoryBloom.exe), or build it locally.
+2. Run it once. Use `Ctrl+Alt+M` or the notification-area icon to bring it into focus.
+3. To install sign-in startup and the desktop shortcut, run:
 
 ```powershell
-.\build.ps1
 .\install-startup.ps1 -LaunchNow
 ```
 
-Startup is installed only for the current Windows user and needs no administrator rights. Settings are saved under `%LOCALAPPDATA%\MemoryBloom`.
+To build from source:
 
-## Firefox limits
+```powershell
+.\build.ps1
+```
 
-Windows can report Firefox's process tree and each process's memory, and Memory Bloom labels browser, tab-content, GPU, socket, media-decoder, extension, built-in-page, and utility roles where Firefox exposes them. The main browser row also shows Firefox's active window/tab title.
+The build is written to `release\MemoryBloom.exe`. Settings are stored under `%LOCALAPPDATA%\MemoryBloom`. Startup is current-user only and requires no administrator privileges.
 
-Expand Firefox → **Web content** for titles and approximate time since each tab was last accessed. Memory Bloom reads Firefox's local recovery snapshot without installing an extension. While Firefox is foreground, it conservatively combines the active window title with short CPU and working-set changes to infer a likely content PID. Each content-process row is independently collapsible and stays that way across refreshes.
+## Controls
 
-Firefox intentionally does not put the actual tab URL/title on every Windows child process. `about:processes` is therefore the accurate built-in per-tab view and is opened directly from the app. A match can become outdated when Firefox combines or moves tabs between content processes; Memory Bloom marks old/uncertain/recently changed observations yellow and cannot detect a silent move until later activity supplies another sample. An optional future companion extension would provide stable tab IDs, event-driven title/activity updates, and tab actions, but Firefox's supported extension API still would not provide an authoritative content-process PID.
+- Click the compact surface or detailed title bar to switch modes.
+- Drag either surface normally; Windows handles edge Snap and maximize behavior.
+- Use `+` / `−` or Ctrl + mouse wheel to scale the compact view.
+- Double-click a process to bring its window forward.
+- Right-click a process for **Bring to front** and **End process…**.
+- Press `Ctrl+Alt+M` or double-click the tray icon to show details.
+
+## Privacy and limitations
+
+All memory, process, and Firefox recovery data is read locally. Memory Bloom sends no telemetry and does not upload browsing data.
+
+Virtual-desktop pinning uses the Windows shell's own internal pinning service—the same behavior exposed as **Show this window on all desktops**. Microsoft does not publish that interface as a stable desktop API, so Memory Bloom treats pinning as best-effort and safely continues on one desktop if a future Windows update changes it.
+
+Development history, visual checkpoints, and next steps are recorded in [PROGRESS.md](PROGRESS.md) and [CHANGELOG.md](CHANGELOG.md).

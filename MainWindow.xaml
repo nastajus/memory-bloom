@@ -1,9 +1,15 @@
 <Window x:Class="MemoryBloom.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Memory Bloom" WindowStyle="None" AllowsTransparency="True" Background="Transparent"
-        ShowInTaskbar="False" ResizeMode="CanResizeWithGrip" Topmost="True"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        Title="Memory Bloom" Icon="Assets/MemoryBloom.ico"
+        WindowStyle="None" AllowsTransparency="False" Background="#FF1A2225"
+        ShowInTaskbar="True" ResizeMode="CanResize" Topmost="True"
         Width="292" Height="116" MinWidth="250" MinHeight="96">
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="0" ResizeBorderThickness="7" GlassFrameThickness="0"
+                            CornerRadius="0" UseAeroCaptionButtons="False"/>
+    </shell:WindowChrome.WindowChrome>
     <Border x:Name="Shell" Background="{StaticResource Panel}" CornerRadius="22" BorderThickness="1"
             BorderBrush="#55697B7D" Padding="12"
             PreviewMouseLeftButtonDown="Shell_PreviewMouseLeftButtonDown"

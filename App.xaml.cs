@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows;
 
@@ -7,10 +8,14 @@ namespace MemoryBloom;
 
 public partial class App : System.Windows.Application
 {
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+    private static extern int SetCurrentProcessExplicitAppUserModelID(string appId);
+
     private Mutex? _singleInstance;
 
     protected override void OnStartup(StartupEventArgs e)
     {
+        SetCurrentProcessExplicitAppUserModelID("MemoryBloom.App");
         _singleInstance = new Mutex(true, "Local\\MemoryBloom.SingleInstance", out var created);
         if (!created)
         {

@@ -2,6 +2,19 @@
 
 Dates are reconstructed from the conversation and build artifacts where available. Early version boundaries are approximate because Git tracking was requested after development had already begun.
 
+## 0.5.0 — 2026-10-23 10:44 America/Toronto
+
+- Replaced coordinate-based dragging with Windows' native non-client move loop and restored standard edge Snap/maximize previews.
+- Enabled native resize/maximize window styles and made Memory Bloom visible in Alt+Tab.
+- Added a generated Memory Bloom application/window/tray icon and embedded multi-resolution `.ico` asset.
+- Added a desktop-shortcut installer and integrated it with sign-in setup.
+- Pinned the Memory Bloom window across virtual desktops through the Windows shell's own pin-view service, with safe best-effort failure handling.
+- Added immediate live foreground-title observation for Firefox rather than waiting for its recovery snapshot.
+- Added a detailed-view-only 500 ms Firefox sampler with decaying multi-sample CPU/working-set evidence for much faster active-tab inference.
+- Made title-only live observations merge into later recovery entries and retain last-interacted timing.
+- Restored stepped/jagged memory-value indentation for parent and child rows.
+- Rebuilt the GitHub README as a screenshot-led project landing page.
+
 ## 0.4.0 — 2026-10-23 10:21 America/Toronto
 
 - Nested known Firefox titles beneath the inferred web-content process instead of presenting all known tabs as a separate peer list.

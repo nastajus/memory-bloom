@@ -2,33 +2,44 @@
 
 This is the human-readable design trail. Every feature or design prompt should add a dated iteration, save new screenshots under `docs/screenshots/<version>/`, update **Current state** and **Next state**, and end with a Git commit.
 
-## Current state — 0.4.0
+## Current state — 0.5.0
 
 - Conditional pressure widget with proportional opacity/color intensity.
-- Minimal and detailed modes with click-versus-drag handling.
+- Minimal and detailed modes with click-versus-drag handling, native Windows move/resize styles, and standard edge Snap/maximize previews.
+- Branded executable/window/tray icon, Alt+Tab presence, desktop shortcut, and best-effort Windows shell pinning across virtual desktops.
 - Stable collapsible process hierarchy and process actions.
-- Firefox titles are placed beneath inferred web-content processes when a foreground activity sample is confident enough; unmatched titles remain in an explicit unresolved section.
+- Firefox's active title is observed live and a 500 ms lightweight sampler accumulates/decays process activity evidence, reducing typical active-tab matching from tens of seconds to the first distinguishable burst.
+- Firefox titles are placed beneath inferred web-content processes when foreground activity separates one candidate; unmatched titles remain in an explicit unresolved section.
 - Per-tab confidence, observation age, recent process drift, and stale/uncertain yellow warnings make the probabilistic mapping visible rather than pretending it is exact.
 - Firefox process rows retain their own expanded/collapsed state, and tab titles use a full-width first line with an indented age/status line.
 - Estimated Windows/cache/kernel/shared-memory reconciliation group.
-- Hierarchy-aware row widths keep memory figures aligned at a common right edge and clear of the scrollbar.
+- Memory figures again step right with parent/child hierarchy while remaining clear of the scrollbar.
 - Dark process context menus and scrollbar.
 
 Screenshots:
 
-- [Overall accounting 0.4.0](docs/screenshots/v0.4.0/detailed.png)
-- [Firefox processes 0.4.0](docs/screenshots/v0.4.0/firefox-processes.png)
-- [Firefox tab titles 0.4.0](docs/screenshots/v0.4.0/firefox-tabs.png)
-- [Minimal 0.4.0](docs/screenshots/v0.4.0/minimal.png)
+- [Overall accounting 0.5.0](docs/screenshots/v0.5.0/detailed.png)
+- [Firefox processes 0.5.0](docs/screenshots/v0.5.0/firefox-processes.png)
+- [Firefox tab titles 0.5.0](docs/screenshots/v0.5.0/firefox-tabs.png)
+- [Minimal 0.5.0](docs/screenshots/v0.5.0/minimal.png)
+- [Application icon 0.5.0](docs/screenshots/v0.5.0/icon.png)
 
-## Next state — 0.5.0
+## Next state — 0.6.0
 
-- Observe real browsing over a longer session and tune the inference threshold from captured confidence/drift behavior.
-- Consider an optional Firefox extension/native-messaging companion for stable tab IDs and live title events; it still would not expose an authoritative Firefox content-process PID.
+- Observe the 500 ms evidence sampler during normal browsing and tune its separation threshold from real ambiguous/static-tab cases.
+- Consider an optional signed Firefox extension/native-messaging companion for stable tab IDs, event-driven background titles, and tab actions; it still would not expose an authoritative Firefox content-process PID.
 - Add direct tab activation/closing only if the optional companion is introduced.
 - Consider persisting recent inferred associations across app restarts with a short expiry.
 
 ## Iterations
+
+### 0.5.0 — Native Windows integration and faster Firefox evidence
+
+Last state: custom coordinate dragging bypassed Windows Snap, the app was absent from Alt+Tab and only lived on one virtual desktop, active Firefox inference sampled only during the six-second heavy refresh, and all memory values ended on a single aligned edge.
+
+Result: the Windows non-client move loop now supplies standard Snap/maximize feedback; native resize/maximize styles are verified; the branded app is visible in Alt+Tab, pinned across virtual desktops, and installable from a desktop shortcut. Live Firefox titles appear without waiting for the recovery file, and a 500 ms rolling activity sampler can associate an active title after the first clear burst. Hierarchical memory indentation is restored.
+
+Next state: measure ambiguous/static Firefox pages in daily use and decide whether an optional signed companion is worth maintaining for stable tab IDs and direct tab controls.
 
 ### 0.4.0 — Per-process Firefox tabs and visual history
 

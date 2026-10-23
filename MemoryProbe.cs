@@ -234,6 +234,24 @@ internal static class MemoryProbe
         return rows;
     }
 
+    public static List<ProcessActivity> ReadProcessActivity(IEnumerable<int> processIds)
+    {
+        var activity = new List<ProcessActivity>();
+        foreach (var processId in processIds)
+        {
+            try
+            {
+                using var process = Process.GetProcessById(processId);
+                activity.Add(new ProcessActivity(processId, process.TotalProcessorTime.TotalMilliseconds, process.WorkingSet64));
+            }
+            catch
+            {
+                // A Firefox content process can disappear between refreshes.
+            }
+        }
+        return activity;
+    }
+
     private static string FriendlyName(string name)
     {
         if (name.Equals("firefox", StringComparison.OrdinalIgnoreCase)) return "Firefox";
