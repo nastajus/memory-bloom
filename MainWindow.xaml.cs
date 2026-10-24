@@ -23,6 +23,12 @@ namespace MemoryBloom;
 
 public partial class MainWindow : Window
 {
+    private enum ExpandedPage
+    {
+        Processes,
+        History
+    }
+
     private const int HotkeyId = 0xB100;
     private const uint ModAlt = 0x0001;
     private const uint ModControl = 0x0002;
@@ -74,6 +80,7 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromSeconds(2) };
     private readonly DispatcherTimer _firefoxTimer = new() { Interval = TimeSpan.FromMilliseconds(250) };
     private readonly FirefoxCompanionServer _firefoxCompanion;
+    private readonly MemoryHistoryStore _history = new();
     private readonly Forms.NotifyIcon _tray;
     private readonly Dictionary<string, bool> _groupExpansionState = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<int, bool> _processExpansionState = new();
@@ -86,6 +93,8 @@ public partial class MainWindow : Window
     private readonly Dictionary<IntPtr, string> _liveTitleKeyByWindow = new();
     private readonly Dictionary<string, DateTime> _supersededLiveTitleKeys = new(StringComparer.Ordinal);
     private readonly HashSet<int> _latestFirefoxTabHostPids = new();
+    private List<HistoryProcessSample> _latestHistoryProcesses = new();
+    private List<SystemHistoryMarker> _historyMarkers = new();
     private List<ProcessGroup> _latestGroups = new();
     private FirefoxTabsSnapshot _firefoxSessionTabs = new();
     private FirefoxTabsSnapshot _firefoxCompanionTabs = new();
@@ -104,6 +113,10 @@ public partial class MainWindow : Window
     private bool _manualOpen;
     private bool _exiting;
     private bool _processRefreshRunning;
+    private bool _historyContextRefreshRunning;
+    private bool _previewMode;
+    private DateTime _lastHistoryContextUtc;
+    private ExpandedPage _expandedPage = ExpandedPage.Processes;
     private int _quietTicks;
     private int _tick;
     private bool _ready;
@@ -129,6 +142,7 @@ public partial class MainWindow : Window
         ProcessTree.FontSize = _settings.ProcessFontSize;
         ProcessFontSizeSlider.Value = _settings.ProcessFontSize;
         ProcessFontSizeText.Text = $"{_settings.ProcessFontSize:0} pt";
+        HistoryChart.ViewChanged += (_, _) => UpdateHistorySummary();
 
         _tray = new Forms.NotifyIcon
         {
@@ -163,6 +177,7 @@ public partial class MainWindow : Window
 
     public void InitializeInBackground(bool showNow, string? previewFolder = null, bool activateInitial = true)
     {
+        _previewMode = previewFolder is not null;
         if (previewFolder is not null)
             Loaded += async (_, _) => await CapturePreviewsAsync(previewFolder);
         ShowActivated = activateInitial;
@@ -175,6 +190,7 @@ public partial class MainWindow : Window
         _ready = true;
         _timer.Start();
         _firefoxTimer.Start();
+        _ = LoadWindowsHistoryAsync();
         _ = SampleAsync();
     }
 
@@ -184,9 +200,13 @@ public partial class MainWindow : Window
         {
             _reading = MemoryProbe.ReadMemory();
             UpdateMemoryVisuals(_reading);
+            _history.Record(_reading, _latestHistoryProcesses, _settings.ShowAtPercent, _settings.HideBelowPercent, persist: !_previewMode);
+            if (DateTime.UtcNow - _lastHistoryContextUtc >= TimeSpan.FromSeconds(30))
+                _ = RefreshHistoryContextAsync();
+            if (_detailed && _expandedPage == ExpandedPage.History) UpdateHistoryView();
             EvaluateVisibility(_reading.PressurePercent);
             _tick++;
-            if (_detailed && (_tick % 3 == 0 || ProcessTree.Items.Count == 0))
+            if (_detailed && _expandedPage == ExpandedPage.Processes && (_tick % 3 == 0 || ProcessTree.Items.Count == 0))
                 await RefreshProcessesAsync();
         }
         catch (Exception ex)
@@ -194,6 +214,28 @@ public partial class MainWindow : Window
             SummaryText.Text = "Memory reading unavailable";
             LoadingText.Text = ex.Message;
         }
+    }
+
+    private async Task RefreshHistoryContextAsync()
+    {
+        if (_historyContextRefreshRunning) return;
+        _historyContextRefreshRunning = true;
+        _lastHistoryContextUtc = DateTime.UtcNow;
+        try
+        {
+            _latestHistoryProcesses = await Task.Run(() => MemoryProbe.ReadTopMemoryConsumers());
+            if (_detailed && _expandedPage == ExpandedPage.History) UpdateHistoryView();
+        }
+        finally
+        {
+            _historyContextRefreshRunning = false;
+        }
+    }
+
+    private async Task LoadWindowsHistoryAsync()
+    {
+        _historyMarkers = await Task.Run(() => WindowsHistoryProbe.ReadRecentMarkers());
+        if (_detailed && _expandedPage == ExpandedPage.History) UpdateHistoryView();
     }
 
     private void EvaluateVisibility(double pressure)
@@ -905,8 +947,10 @@ public partial class MainWindow : Window
 
         _manualOpen = true;
         _detailed = true;
+        _expandedPage = ExpandedPage.Processes;
         MinimalView.Visibility = Visibility.Collapsed;
         DetailedView.Visibility = Visibility.Visible;
+        ApplyExpandedPage();
         Shell.LayoutTransform = Transform.Identity;
         Topmost = false;
         ResizeMode = ResizeMode.CanResize;
@@ -929,6 +973,73 @@ public partial class MainWindow : Window
         ShowActivated = true;
         Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(ApplyNativeWindowShape));
         _ = RefreshProcessesAsync();
+    }
+
+    private void ApplyExpandedPage()
+    {
+        var processes = _expandedPage == ExpandedPage.Processes;
+        ProcessSummary.Visibility = processes ? Visibility.Visible : Visibility.Collapsed;
+        ProcessTreeContainer.Visibility = processes ? Visibility.Visible : Visibility.Collapsed;
+        ProcessFooter.Visibility = processes ? Visibility.Visible : Visibility.Collapsed;
+        HistoryPage.Visibility = processes ? Visibility.Collapsed : Visibility.Visible;
+        FirefoxProcessesButton.Visibility = processes ? Visibility.Visible : Visibility.Collapsed;
+        PageSwitchButton.Content = processes ? "History" : "Processes";
+        PageSwitchButton.ToolTip = processes ? "Open the memory history timeline" : "Return to the process investigator";
+        if (!processes) UpdateHistoryView();
+    }
+
+    private void ShowHistoryPage()
+    {
+        if (!_detailed) ShowDetails();
+        _expandedPage = ExpandedPage.History;
+        ApplyExpandedPage();
+    }
+
+    private void ShowProcessPage()
+    {
+        if (!_detailed) ShowDetails();
+        _expandedPage = ExpandedPage.Processes;
+        ApplyExpandedPage();
+        _ = RefreshProcessesAsync();
+    }
+
+    private void UpdateHistoryView()
+    {
+        HistoryChart.SetData(_history.Points, _historyMarkers);
+        UpdateHistorySummary();
+    }
+
+    private void UpdateHistorySummary()
+    {
+        if (HistoryChart is null) return;
+        var start = HistoryChart.VisibleStartUtc;
+        var end = HistoryChart.VisibleEndUtc;
+        var visible = _history.Points.Where(point => point.TimestampUtc >= start && point.TimestampUtc <= end).ToList();
+        var markers = _historyMarkers.Count(marker => marker.TimestampUtc >= start && marker.TimestampUtc <= end);
+        HistoryCurrentText.Text = _reading is null ? "--%" : $"{_reading.PressurePercent:0}%";
+        var measuredPeak = visible.Select(point => (double?)point.PressurePercent)
+            .Concat(_historyMarkers.Where(marker => marker.TimestampUtc >= start && marker.TimestampUtc <= end).Select(marker => marker.PressurePercent))
+            .Where(value => value is not null)
+            .Select(value => value!.Value)
+            .DefaultIfEmpty(double.NaN)
+            .Max();
+        HistoryPeakText.Text = double.IsNaN(measuredPeak) ? "--%" : $"{measuredPeak:0}%";
+        HistorySpikeText.Text = (markers + visible.Count(point => point.Classification != "Normal")).ToString(CultureInfo.CurrentCulture);
+        HistorySinceText.Text = _history.TrackingSinceUtc is DateTime since
+            ? $"Since {since.ToLocalTime():g}"
+            : "Starting now";
+        var range = HistoryChart.VisibleRange;
+        HistoryRangeText.Text = HistoryChart.IsFollowingLive
+            ? $"Live · {FormatHistoryRange(range)}"
+            : $"{start.ToLocalTime():g} – {end.ToLocalTime():g}";
+    }
+
+    private static string FormatHistoryRange(TimeSpan? range)
+    {
+        if (range is null) return "all retained data";
+        if (range.Value.TotalDays >= 1) return $"{range.Value.TotalDays:0} day{(range.Value.TotalDays == 1 ? "" : "s")}";
+        if (range.Value.TotalHours >= 1) return $"{range.Value.TotalHours:0} hour{(range.Value.TotalHours == 1 ? "" : "s")}";
+        return $"{range.Value.TotalMinutes:0} minutes";
     }
 
     private void ShowMinimal(bool manual)
@@ -966,7 +1077,7 @@ public partial class MainWindow : Window
     private void SetMinimalSize()
     {
         if (WindowState != WindowState.Normal) WindowState = WindowState.Normal;
-        ResizeMode = ResizeMode.CanResize;
+        ResizeMode = ResizeMode.NoResize;
         MinWidth = 0;
         MinHeight = 0;
         Width = 292 * _settings.Scale;
@@ -1211,6 +1322,14 @@ public partial class MainWindow : Window
 
     private IntPtr WindowHook(IntPtr hwnd, int message, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
+        const int wmSysCommand = 0x0112;
+        const int wmNcLeftButtonDoubleClick = 0x00A3;
+        const int scMaximize = 0xF030;
+        if (!_detailed && ((message == wmSysCommand && (wParam.ToInt64() & 0xFFF0) == scMaximize) || message == wmNcLeftButtonDoubleClick))
+        {
+            handled = true;
+            return IntPtr.Zero;
+        }
         if (message == 0x0312 && wParam.ToInt32() == HotkeyId)
         {
             ShowDetails();
@@ -1223,6 +1342,7 @@ public partial class MainWindow : Window
     {
         var menu = new Forms.ContextMenuStrip();
         menu.Items.Add("Show details", null, (_, _) => Dispatcher.Invoke(ShowDetails));
+        menu.Items.Add("Show history", null, (_, _) => Dispatcher.Invoke(ShowHistoryPage));
         menu.Items.Add("Show compact", null, (_, _) => Dispatcher.Invoke(() => ShowMinimal(manual: true)));
         menu.Items.Add("Hide until pressure rises", null, (_, _) => Dispatcher.Invoke(HideUntilPressure));
         menu.Items.Add(new Forms.ToolStripSeparator());
@@ -1313,6 +1433,7 @@ public partial class MainWindow : Window
             UpdateLayout();
             SaveVisual(System.IO.Path.Combine(folder, "firefox-tabs.png"));
             CaptureLargeProcessTextPreview(System.IO.Path.Combine(folder, "detailed-large-text.png"));
+            CaptureHistoryPreview(System.IO.Path.Combine(folder, "history.png"));
 
             ShowMinimal(manual: true);
             UpdateLayout();
@@ -1421,6 +1542,60 @@ public partial class MainWindow : Window
         UpdateLayout();
     }
 
+    private void CaptureHistoryPreview(string path)
+    {
+        var now = DateTime.UtcNow;
+        const ulong physicalTotal = 32UL * 1024 * 1024 * 1024;
+        const ulong commitLimit = 48UL * 1024 * 1024 * 1024;
+        var processes = new List<HistoryProcessSample>
+        {
+            new("Firefox", 649852, 3_780_000_000),
+            new("Visual Studio Code", 512440, 1_260_000_000),
+            new("Desktop Window Manager", 2280, 610_000_000)
+        };
+        var points = new List<MemoryHistoryPoint>();
+        for (var index = 0; index <= 360; index++)
+        {
+            var hours = index / 60d;
+            var basePressure = 54 + 3 * Math.Sin(index / 5d);
+            var firstSpike = 30 * Math.Exp(-Math.Pow((hours - 2.1) / 0.20, 2));
+            var criticalSpike = 43 * Math.Exp(-Math.Pow((hours - 4.65) / 0.24, 2));
+            var physical = Math.Clamp(basePressure + firstSpike + criticalSpike, 0, 96);
+            var commit = Math.Clamp(physical + 3 + 2 * Math.Sin(index / 7d), 0, 98);
+            var classification = index == 126 ? "Spike" : index == 279 ? "Critical" : index == 294 ? "Recovered" : "Normal";
+            points.Add(new MemoryHistoryPoint
+            {
+                TimestampUtc = now - TimeSpan.FromHours(6) + TimeSpan.FromMinutes(index),
+                PhysicalPercent = physical,
+                CommitPercent = commit,
+                PhysicalUsedBytes = (ulong)(physicalTotal * physical / 100),
+                PhysicalTotalBytes = physicalTotal,
+                CommitUsedBytes = (ulong)(commitLimit * commit / 100),
+                CommitLimitBytes = commitLimit,
+                Classification = classification,
+                TopProcesses = processes
+            });
+        }
+        var markers = new List<SystemHistoryMarker>
+        {
+            new(now - TimeSpan.FromHours(1.35), "Resource exhaustion", "Windows recorded low virtual memory or resource exhaustion", "Physical 94.2% · Commit 99.1% · recorded leaders: firefox.exe, Code.exe", 94.2, 99.1)
+        };
+
+        ShowHistoryPage();
+        HistoryChart.SetRange(TimeSpan.FromHours(6));
+        HistoryChart.SetData(points, markers);
+        HistoryCurrentText.Text = $"{points[^1].PressurePercent:0}%";
+        HistoryPeakText.Text = $"{points.Max(point => point.PressurePercent):0}%";
+        HistorySpikeText.Text = "4";
+        HistorySinceText.Text = "Since 6 hours ago";
+        HistoryRangeText.Text = "Live · 6 hours";
+        UpdateLayout();
+        SaveVisual(path);
+        HistoryChart.SetPreviewHover(0.77, 0.58);
+        UpdateLayout();
+        SaveVisual(System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path)!, "history-hover.png"));
+    }
+
     private void SaveVisual(string path)
     {
         var width = Math.Max(1, (int)Math.Ceiling(ActualWidth));
@@ -1444,9 +1619,21 @@ public partial class MainWindow : Window
     private void ZoomIn_Click(object sender, RoutedEventArgs e) { ChangeScale(0.10); e.Handled = true; }
     private void ZoomOut_Click(object sender, RoutedEventArgs e) { ChangeScale(-0.10); e.Handled = true; }
     private void Exit_Click(object sender, RoutedEventArgs e) => ExitApp();
+    private void PageSwitch_Click(object sender, RoutedEventArgs e)
+    {
+        if (_expandedPage == ExpandedPage.Processes) ShowHistoryPage();
+        else ShowProcessPage();
+        e.Handled = true;
+    }
     private void ShowMinimal_Click(object sender, RoutedEventArgs e) => ShowMinimal(manual: true);
     private void Hide_Click(object sender, RoutedEventArgs e) => HideUntilPressure();
     private void MainWindow_MouseWheel(object sender, MouseWheelEventArgs e) { if ((Keyboard.Modifiers & ModifierKeys.Control) != 0) ChangeScale(e.Delta > 0 ? 0.10 : -0.10); }
+    private void History1Hour_Click(object sender, RoutedEventArgs e) => HistoryChart.SetRange(TimeSpan.FromHours(1));
+    private void History6Hours_Click(object sender, RoutedEventArgs e) => HistoryChart.SetRange(TimeSpan.FromHours(6));
+    private void History24Hours_Click(object sender, RoutedEventArgs e) => HistoryChart.SetRange(TimeSpan.FromHours(24));
+    private void History7Days_Click(object sender, RoutedEventArgs e) => HistoryChart.SetRange(TimeSpan.FromDays(7));
+    private void HistoryAll_Click(object sender, RoutedEventArgs e) => HistoryChart.SetRange(null);
+    private void HistoryLive_Click(object sender, RoutedEventArgs e) => HistoryChart.FollowLive();
 
     private void ThresholdSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {

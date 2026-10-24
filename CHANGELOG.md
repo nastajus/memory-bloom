@@ -4,6 +4,12 @@ Concise user-visible release notes. The engineering audit is kept separately in 
 
 Dates for early releases are reconstructed from the conversation and build artifacts because Git tracking began after initial development.
 
+## 0.13.0 — 2026-10-24
+
+- Added a persistent, zoomable History screen with physical/commit timelines, hover details, spike/critical/recovery flags, and periodic top-process context.
+- Backfilled distinct Windows resource-exhaustion, crash/error-report, and unexpected restart/shutdown markers without presenting them as continuous sampled history.
+- Limited Windows Snap/maximize behavior to expanded Process and History screens; compact mode remains freely draggable at its chosen size.
+
 ## 0.12.0 — 2026-10-23
 
 - Added a persistent 10–18 pt process-text slider to the detailed view.

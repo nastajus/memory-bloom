@@ -253,6 +253,27 @@ internal static class MemoryProbe
         return activity;
     }
 
+    public static List<HistoryProcessSample> ReadTopMemoryConsumers(int count = 8)
+    {
+        var result = new List<HistoryProcessSample>();
+        foreach (var process in Process.GetProcesses())
+        {
+            using (process)
+            {
+                try
+                {
+                    if (process.Id == Environment.ProcessId || process.PrivateMemorySize64 <= 0) continue;
+                    result.Add(new HistoryProcessSample(FriendlyName(process.ProcessName), process.Id, process.PrivateMemorySize64));
+                }
+                catch
+                {
+                    // Processes can exit or become inaccessible between enumeration and sampling.
+                }
+            }
+        }
+        return result.OrderByDescending(process => process.PrivateBytes).Take(Math.Max(1, count)).ToList();
+    }
+
     private static string FriendlyName(string name)
     {
         if (name.Equals("firefox", StringComparison.OrdinalIgnoreCase)) return "Firefox";
