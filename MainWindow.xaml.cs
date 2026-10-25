@@ -23,6 +23,9 @@ namespace MemoryBloom;
 
 public partial class MainWindow : Window
 {
+    private const double CompactCardWidth = 292;
+    private const double CompactCardHeight = 116;
+    private const double CompactOrbSize = 92;
     private enum ExpandedPage
     {
         Processes,
@@ -123,6 +126,7 @@ public partial class MainWindow : Window
     private bool _surfacePointerDown;
     private bool _surfaceDragging;
     private bool _updatingProcessFontSize;
+    private bool _orbExpanded;
     private Point _pointerStartScreen;
     private bool _hasCompactAnchor;
     private bool _compactAnchoredRight;
@@ -130,6 +134,7 @@ public partial class MainWindow : Window
     private double _compactRight;
     private double _compactTop;
     private Rect _compactWorkArea;
+    private bool UseOrbCompact => !_settings.CompactStyle.Equals("Card", StringComparison.OrdinalIgnoreCase);
 
     public MainWindow()
     {
@@ -139,9 +144,19 @@ public partial class MainWindow : Window
         ThresholdSlider.Value = _settings.ShowAtPercent;
         ThresholdText.Text = $"{_settings.ShowAtPercent:0}%";
         _settings.ProcessFontSize = Math.Clamp(Math.Round(_settings.ProcessFontSize), 10, 18);
+        if (!_settings.CompactStyle.Equals("Card", StringComparison.OrdinalIgnoreCase))
+            _settings.CompactStyle = "Orb";
+        if (!_settings.OrbLocationMigrated)
+        {
+            if (UseOrbCompact && double.IsFinite(_settings.Left))
+                _settings.Left += (CompactCardWidth - CompactOrbSize) * _settings.Scale;
+            _settings.OrbLocationMigrated = true;
+            _settings.Save();
+        }
         ProcessTree.FontSize = _settings.ProcessFontSize;
         ProcessFontSizeSlider.Value = _settings.ProcessFontSize;
         ProcessFontSizeText.Text = $"{_settings.ProcessFontSize:0} pt";
+        UpdateCompactStyleButton();
         HistoryChart.ViewChanged += (_, _) => UpdateHistorySummary();
 
         _tray = new Forms.NotifyIcon
@@ -163,8 +178,8 @@ public partial class MainWindow : Window
         };
         SizeChanged += (_, _) => ApplyNativeWindowShape();
         StateChanged += (_, _) => ApplyNativeWindowShape();
-        MouseEnter += (_, _) => Opacity = 1;
-        MouseLeave += (_, _) => Opacity = _restingOpacity;
+        MouseEnter += MainWindow_MouseEnter;
+        MouseLeave += MainWindow_MouseLeave;
         Closed += (_, _) => Cleanup();
         Closing += (_, e) =>
         {
@@ -952,6 +967,7 @@ public partial class MainWindow : Window
         DetailedView.Visibility = Visibility.Visible;
         ApplyExpandedPage();
         Shell.LayoutTransform = Transform.Identity;
+        Shell.CornerRadius = new CornerRadius(22);
         Topmost = false;
         ResizeMode = ResizeMode.CanResize;
         MinWidth = 760;
@@ -1080,9 +1096,63 @@ public partial class MainWindow : Window
         ResizeMode = ResizeMode.NoResize;
         MinWidth = 0;
         MinHeight = 0;
-        Width = 292 * _settings.Scale;
-        Height = 116 * _settings.Scale;
+        _orbExpanded = false;
+        ApplyCompactPresentation();
+        Width = (UseOrbCompact ? CompactOrbSize : CompactCardWidth) * _settings.Scale;
+        Height = (UseOrbCompact ? CompactOrbSize : CompactCardHeight) * _settings.Scale;
         Shell.LayoutTransform = new ScaleTransform(_settings.Scale, _settings.Scale);
+        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(ApplyNativeWindowShape));
+    }
+
+    private void ApplyCompactPresentation()
+    {
+        if (UseOrbCompact)
+        {
+            CompactLeftColumn.Width = _orbExpanded ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
+            CompactCenterColumn.Width = new GridLength(76);
+            CompactRightColumn.Width = new GridLength(0);
+            Grid.SetColumn(MinimalTextPanel, 0);
+            Grid.SetColumn(MinimalGauge, 1);
+            MinimalTextPanel.Visibility = _orbExpanded ? Visibility.Visible : Visibility.Collapsed;
+            MinimalZoomPanel.Visibility = Visibility.Collapsed;
+            Shell.CornerRadius = new CornerRadius(CompactOrbSize / 2);
+        }
+        else
+        {
+            CompactLeftColumn.Width = new GridLength(76);
+            CompactCenterColumn.Width = new GridLength(1, GridUnitType.Star);
+            CompactRightColumn.Width = new GridLength(28);
+            Grid.SetColumn(MinimalGauge, 0);
+            Grid.SetColumn(MinimalTextPanel, 1);
+            MinimalTextPanel.Visibility = Visibility.Visible;
+            MinimalZoomPanel.Visibility = Visibility.Visible;
+            Shell.CornerRadius = new CornerRadius(22);
+        }
+    }
+
+    private void SetOrbExpanded(bool expanded)
+    {
+        if (_detailed || !UseOrbCompact || _orbExpanded == expanded) return;
+        var currentWidth = ActualWidth > 0 ? ActualWidth : Width;
+        var right = Left + currentWidth;
+        _orbExpanded = expanded;
+        ApplyCompactPresentation();
+        Width = (expanded ? CompactCardWidth : CompactOrbSize) * _settings.Scale;
+        Height = CompactOrbSize * _settings.Scale;
+        Left = right - Width;
+        ApplyNativeWindowShape();
+    }
+
+    private void MainWindow_MouseEnter(object sender, MouseEventArgs e)
+    {
+        Opacity = 1;
+        SetOrbExpanded(true);
+    }
+
+    private void MainWindow_MouseLeave(object sender, MouseEventArgs e)
+    {
+        SetOrbExpanded(false);
+        Opacity = _restingOpacity;
     }
 
     private void ChangeScale(double delta)
@@ -1094,6 +1164,26 @@ public partial class MainWindow : Window
             SetMinimalSize();
             PositionAtEdgeIfNeeded(force: true);
         }
+    }
+
+    private void UpdateCompactStyleButton()
+    {
+        CompactStyleButton.Content = UseOrbCompact ? "Circle · text on hover" : "Full card";
+    }
+
+    private void CompactStyle_Click(object sender, RoutedEventArgs e)
+    {
+        _settings.CompactStyle = UseOrbCompact ? "Card" : "Orb";
+        _settings.Save();
+        UpdateCompactStyleButton();
+        if (!_detailed)
+        {
+            var right = Left + (ActualWidth > 0 ? ActualWidth : Width);
+            SetMinimalSize();
+            Left = right - Width;
+            SaveLocationIfReady();
+        }
+        e.Handled = true;
     }
 
     private void PositionAtEdgeIfNeeded(bool force = false)
@@ -1303,7 +1393,8 @@ public partial class MainWindow : Window
         var width = Math.Max(1, rectangle.Right - rectangle.Left);
         var height = Math.Max(1, rectangle.Bottom - rectangle.Top);
         var dpiScale = Math.Max(1, GetDpiForWindow(window)) / 96d;
-        var radius = (int)Math.Round(22 * (_detailed ? 1 : _settings.Scale) * dpiScale);
+        var compactRadius = UseOrbCompact ? CompactOrbSize / 2 : 22;
+        var radius = (int)Math.Round((_detailed ? 22 : compactRadius * _settings.Scale) * dpiScale);
         var region = CreateRoundRectRgn(0, 0, width + 1, height + 1, radius * 2, radius * 2);
         if (region == IntPtr.Zero) return;
         if (SetWindowRgn(window, region, true) == 0) DeleteObject(region);
@@ -1439,6 +1530,7 @@ public partial class MainWindow : Window
             UpdateLayout();
             SaveVisual(System.IO.Path.Combine(folder, "minimal.png"));
             CaptureSurfaceMenuPreview(MinimalView, System.IO.Path.Combine(folder, "compact-context-menu.png"), overlayOnWindow: false);
+            CaptureCompactVariants(folder);
             CapturePressureTierPreviews(folder);
         }
         finally
@@ -1461,8 +1553,7 @@ public partial class MainWindow : Window
         var windowHeight = Math.Max(1, (int)Math.Ceiling(ActualHeight));
         var menuWidth = Math.Max(1, (int)Math.Ceiling(menu.ActualWidth));
         var menuHeight = Math.Max(1, (int)Math.Ceiling(menu.ActualHeight));
-        var windowBitmap = new RenderTargetBitmap(windowWidth, windowHeight, 96, 96, PixelFormats.Pbgra32);
-        windowBitmap.Render(this);
+        var windowBitmap = RenderWindowBitmap();
         var menuBitmap = new RenderTargetBitmap(menuWidth, menuHeight, 96, 96, PixelFormats.Pbgra32);
         menuBitmap.Render(menu);
 
@@ -1532,6 +1623,34 @@ public partial class MainWindow : Window
         }
     }
 
+    private void CaptureCompactVariants(string folder)
+    {
+        var originalStyle = _settings.CompactStyle;
+        try
+        {
+            _settings.CompactStyle = "Orb";
+            SetMinimalSize();
+            SetOrbExpanded(true);
+            Opacity = 1;
+            UpdateLayout();
+            SaveVisual(System.IO.Path.Combine(folder, "compact-hover.png"));
+            SetOrbExpanded(false);
+
+            _settings.CompactStyle = "Card";
+            SetMinimalSize();
+            Opacity = 1;
+            UpdateLayout();
+            SaveVisual(System.IO.Path.Combine(folder, "compact-card.png"));
+        }
+        finally
+        {
+            _settings.CompactStyle = originalStyle;
+            SetMinimalSize();
+            if (_reading is not null) UpdateMemoryVisuals(_reading);
+            UpdateLayout();
+        }
+    }
+
     private void CaptureLargeProcessTextPreview(string path)
     {
         var originalSize = _settings.ProcessFontSize;
@@ -1598,14 +1717,30 @@ public partial class MainWindow : Window
 
     private void SaveVisual(string path)
     {
-        var width = Math.Max(1, (int)Math.Ceiling(ActualWidth));
-        var height = Math.Max(1, (int)Math.Ceiling(ActualHeight));
-        var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
-        bitmap.Render(this);
+        var bitmap = RenderWindowBitmap();
         var encoder = new PngBitmapEncoder();
         encoder.Frames.Add(BitmapFrame.Create(bitmap));
         using var stream = System.IO.File.Create(path);
         encoder.Save(stream);
+    }
+
+    private RenderTargetBitmap RenderWindowBitmap()
+    {
+        var width = Math.Max(1, (int)Math.Ceiling(ActualWidth));
+        var height = Math.Max(1, (int)Math.Ceiling(ActualHeight));
+        var source = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
+        source.Render(this);
+        var radius = _detailed ? 22 : UseOrbCompact ? Math.Min(width, height) / 2d : 22 * _settings.Scale;
+        var clipped = new DrawingVisual();
+        using (var context = clipped.RenderOpen())
+        {
+            context.PushClip(new RectangleGeometry(new Rect(0, 0, width, height), radius, radius));
+            context.DrawImage(source, new Rect(0, 0, width, height));
+            context.Pop();
+        }
+        var result = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
+        result.Render(clipped);
+        return result;
     }
 
     private void SaveLocationIfReady()

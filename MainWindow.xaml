@@ -4,7 +4,7 @@
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         xmlns:local="clr-namespace:MemoryBloom"
         Title="Memory Bloom" Icon="Assets/MemoryBloom.ico"
-        WindowStyle="None" AllowsTransparency="False" Background="Transparent"
+        WindowStyle="None" AllowsTransparency="False" Background="#FF1A2225"
         ShowInTaskbar="True" ResizeMode="CanResize" Topmost="True"
         Width="292" Height="116" MinWidth="250" MinHeight="96">
     <shell:WindowChrome.WindowChrome>
@@ -24,23 +24,23 @@
         <Grid>
             <Grid x:Name="MinimalView" ContextMenu="{StaticResource SurfaceContextMenu}">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="76"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="28"/>
+                    <ColumnDefinition x:Name="CompactLeftColumn" Width="76"/>
+                    <ColumnDefinition x:Name="CompactCenterColumn" Width="*"/>
+                    <ColumnDefinition x:Name="CompactRightColumn" Width="28"/>
                 </Grid.ColumnDefinitions>
-                <Grid Width="68" Height="68">
+                <Grid x:Name="MinimalGauge" Width="68" Height="68">
                     <Ellipse Stroke="#31505B60" StrokeThickness="7"/>
                     <Path x:Name="PressureArc" Stroke="#FF75D6B2" StrokeThickness="7" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
                     <Ellipse x:Name="Pulse" Width="34" Height="34" Fill="#4475D6B2"/>
                     <TextBlock x:Name="PercentText" Text="--" Foreground="{StaticResource TextPrimary}" FontSize="17"
                                FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Grid>
-                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="7,0,4,0">
+                <StackPanel x:Name="MinimalTextPanel" Grid.Column="1" VerticalAlignment="Center" Margin="7,0,4,0">
                     <TextBlock x:Name="PressureTagline" Text="Memory is getting busy" Foreground="{StaticResource TextPrimary}" FontSize="14" FontWeight="SemiBold"/>
                     <TextBlock x:Name="SummaryText" Text="Checking pressure…" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,4,0,0"/>
                     <TextBlock Text="Click for details" Foreground="#FF75D6B2" FontSize="10" Margin="0,4,0,0"/>
                 </StackPanel>
-                <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                <StackPanel x:Name="MinimalZoomPanel" Grid.Column="2" VerticalAlignment="Center">
                     <Button Click="ZoomIn_Click" ToolTip="Make larger" Padding="3,0" FontSize="14">+</Button>
                     <Button Click="ZoomOut_Click" ToolTip="Make smaller" Padding="3,0" FontSize="14">−</Button>
                 </StackPanel>
@@ -125,6 +125,16 @@
                             <TextBlock Text="Alert at" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
                             <Slider x:Name="ThresholdSlider" Grid.Column="1" Minimum="65" Maximum="95" Margin="7,0" ValueChanged="ThresholdSlider_ValueChanged"/>
                             <TextBlock x:Name="ThresholdText" Grid.Column="2" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                        </Grid>
+                        <Grid Margin="0,2,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="62"/>
+                                <ColumnDefinition Width="156"/>
+                                <ColumnDefinition Width="8"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Compact" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                            <Button x:Name="CompactStyleButton" Grid.Column="1" Click="CompactStyle_Click" Margin="7,1,0,1" Padding="7,3"
+                                    ToolTip="Choose a circle that reveals text on hover or the original full card">Circle · text on hover</Button>
                         </Grid>
                     </StackPanel>
                 </Grid>

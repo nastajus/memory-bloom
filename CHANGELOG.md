@@ -4,6 +4,12 @@ Concise user-visible release notes. The engineering audit is kept separately in 
 
 Dates for early releases are reconstructed from the conversation and build artifacts because Git tracking began after initial development.
 
+## 0.14.0 — 2026-10-25
+
+- Added a new default 92 px pressure orb that expands its explanation to the left on hover while keeping the circle fixed on the right.
+- Added a persistent Process-screen setting to switch between the new orb and the original full compact card.
+- Restored an opaque native-window backing beneath pressure-based opacity, preventing split dark/translucent regions in off-screen Alt+Tab thumbnails while preserving rounded native clipping.
+
 ## 0.13.0 — 2026-10-24
 
 - Added a persistent, zoomable History screen with physical/commit timelines, hover details, spike/critical/recovery flags, and periodic top-process context.

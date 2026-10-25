@@ -8,11 +8,11 @@ Memory Bloom is a quiet Windows memory-pressure companion. It stays invisible wh
 
 ## Compact when everything is fine
 
-The primary view is deliberately small. Its ring, accent color, status language, and whole-window opacity intensify with memory pressure; hovering makes it fully opaque. It can remain tucked against either side of a monitor, appear only when its configured threshold is crossed, and disappear again after pressure settles.
+The default primary view is now a pressure orb: only the circle remains at rest, and hovering makes it fully opaque while revealing its status text in a capsule that grows to the left. The circle stays fixed at the right edge of that capsule, so information appears without shifting the visual anchor. Its ring, accent color, and whole-window opacity intensify with memory pressure; it appears only when its configured threshold is crossed and disappears again after pressure settles. The original full card remains available from the Process screen's **Compact** setting.
 
-| Comfortable state · normally hidden | High pressure · fully opaque on hover |
+| Orb at rest | Text revealed on hover |
 |---|---|
-| ![Memory Bloom at 55 percent with low resting opacity](docs/screenshots/v0.1.0/tier-comfortable-55.png) | ![Memory Bloom at 92 percent and fully opaque](docs/screenshots/v0.8.0/minimal.png) |
+| ![Memory Bloom's compact pressure orb](docs/screenshots/v0.14.0/minimal.png) | ![Memory Bloom orb expanding left to reveal its explanation](docs/screenshots/v0.14.0/compact-hover.png) |
 
 ## Expanded when you need an explanation
 
@@ -33,9 +33,10 @@ Windows does not retain a continuous historical RAM graph by default, so Bloom d
 ## What it does
 
 - Appears automatically at a configurable pressure threshold and hides again with hysteresis.
-- Makes its color, glow, gauge, and whole-window opacity more intense as pressure rises.
+- Makes its color, glow, gauge, and uniform whole-window opacity more intense as pressure rises, including in Windows' Alt+Tab representation.
 - Becomes fully opaque while hovered, then returns to its pressure-based opacity when the pointer leaves.
 - Switches between a small compact view, a detailed process investigator, and an interactive memory-history timeline; expanded modes grow inward from whichever half of the monitor holds the compact view.
+- Defaults to a 92 px pressure orb whose text expands left on hover; the original full compact card is a persistent setting in Processes.
 - Keeps compact mode freely draggable but non-snapping; expanded Process and History screens use normal Windows resizing and Snap behavior, including the top-edge maximize preview.
 - Records a 30-day local history with spike/critical/recovery flags, periodic top-process context, and clearly separate Windows incident backfill.
 - Appears in Alt+Tab with its own icon and pins its window across Windows virtual desktops.
@@ -70,7 +71,7 @@ The companion is necessary for a prompt, complete catalog of open tabs. Without 
 
 Memory Bloom currently targets Windows 11 and the .NET 10 Desktop Runtime.
 
-1. Download [MemoryBloom.exe](docs/releases/v0.13.0/MemoryBloom.exe), or build it locally.
+1. Download [MemoryBloom.exe](docs/releases/v0.14.0/MemoryBloom.exe), or build it locally.
 2. Run it once. Use `Ctrl+Alt+M` or the notification-area icon to bring it into focus.
 3. To install sign-in startup and the desktop shortcut, run:
 
@@ -92,7 +93,8 @@ The build is written to `release\MemoryBloom.exe`. Settings are stored under `%L
 - Use **History** / **Processes** in the expanded title bar to switch investigations.
 - Drag every surface normally. Compact remains its chosen size near screen edges; expanded Process and History screens participate in Windows Snap and maximize.
 - In History, hover for exact readings and top-process context, wheel to zoom, drag to pan, use the range presets, and double-click or choose **Live** to return to now.
-- Use `+` / `−` or Ctrl + mouse wheel to scale the compact view.
+- Use Ctrl + mouse wheel to scale either compact style; the full-card option also shows `+` / `−` buttons.
+- Use **Compact** at the bottom-right of Processes to switch persistently between **Circle · text on hover** and **Full card**.
 - Right-click either the compact view or the detailed title bar and choose **Exit Memory Bloom** to quit.
 - Use the detailed view's **Text size** slider to resize process and Firefox tab text from 10–18 pt; the choice persists.
 - Double-click a process to bring its window forward.
