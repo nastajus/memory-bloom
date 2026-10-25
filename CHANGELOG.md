@@ -4,6 +4,12 @@ Concise user-visible release notes. The engineering audit is kept separately in 
 
 Dates for early releases are reconstructed from the conversation and build artifacts because Git tracking began after initial development.
 
+## 0.15.0 — 2026-10-25
+
+- Corrected the orb's usable geometry so the shell, gauge, pulse, and percentage are perfectly concentric without a clipped vertical edge.
+- Debounced hover exit to prevent resize-driven rapid toggling between the orb and expanded compact state.
+- Made hover text expand inward from the nearest monitor edge while keeping the circle fixed as the edge-relative anchor.
+
 ## 0.14.0 — 2026-10-25
 
 - Added a new default 92 px pressure orb that expands its explanation to the left on hover while keeping the circle fixed on the right.

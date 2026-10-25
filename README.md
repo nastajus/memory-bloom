@@ -8,11 +8,11 @@ Memory Bloom is a quiet Windows memory-pressure companion. It stays invisible wh
 
 ## Compact when everything is fine
 
-The default primary view is now a pressure orb: only the circle remains at rest, and hovering makes it fully opaque while revealing its status text in a capsule that grows to the left. The circle stays fixed at the right edge of that capsule, so information appears without shifting the visual anchor. Its ring, accent color, and whole-window opacity intensify with memory pressure; it appears only when its configured threshold is crossed and disappears again after pressure settles. The original full card remains available from the Process screen's **Compact** setting.
+The default primary view is now a pressure orb: only the circle remains at rest, and hovering makes it fully opaque while revealing its status text. The closest monitor edge determines the anchor—an orb on the right reveals text to its left, while an orb on the left reveals text to its right—so the circle stays fixed where the user placed it. Its ring, accent color, and whole-window opacity intensify with memory pressure; it appears only when its configured threshold is crossed and disappears again after pressure settles. The original full card remains available from the Process screen's **Compact** setting.
 
-| Orb at rest | Text revealed on hover |
-|---|---|
-| ![Memory Bloom's compact pressure orb](docs/screenshots/v0.14.0/minimal.png) | ![Memory Bloom orb expanding left to reveal its explanation](docs/screenshots/v0.14.0/compact-hover.png) |
+| Orb at rest | Right-edge expansion | Left-edge expansion |
+|---|---|---|
+| ![Memory Bloom's concentric compact pressure orb](docs/screenshots/v0.15.0/minimal.png) | ![Right-anchored Memory Bloom orb revealing text to the left](docs/screenshots/v0.15.0/compact-expand-left.png) | ![Left-anchored Memory Bloom orb revealing text to the right](docs/screenshots/v0.15.0/compact-expand-right.png) |
 
 ## Expanded when you need an explanation
 
@@ -36,7 +36,7 @@ Windows does not retain a continuous historical RAM graph by default, so Bloom d
 - Makes its color, glow, gauge, and uniform whole-window opacity more intense as pressure rises, including in Windows' Alt+Tab representation.
 - Becomes fully opaque while hovered, then returns to its pressure-based opacity when the pointer leaves.
 - Switches between a small compact view, a detailed process investigator, and an interactive memory-history timeline; expanded modes grow inward from whichever half of the monitor holds the compact view.
-- Defaults to a 92 px pressure orb whose text expands left on hover; the original full compact card is a persistent setting in Processes.
+- Defaults to a concentric 92 px pressure orb whose text expands inward from the nearest monitor edge; the original full compact card is a persistent setting in Processes.
 - Keeps compact mode freely draggable but non-snapping; expanded Process and History screens use normal Windows resizing and Snap behavior, including the top-edge maximize preview.
 - Records a 30-day local history with spike/critical/recovery flags, periodic top-process context, and clearly separate Windows incident backfill.
 - Appears in Alt+Tab with its own icon and pins its window across Windows virtual desktops.
@@ -71,7 +71,7 @@ The companion is necessary for a prompt, complete catalog of open tabs. Without 
 
 Memory Bloom currently targets Windows 11 and the .NET 10 Desktop Runtime.
 
-1. Download [MemoryBloom.exe](docs/releases/v0.14.0/MemoryBloom.exe), or build it locally.
+1. Download [MemoryBloom.exe](docs/releases/v0.15.0/MemoryBloom.exe), or build it locally.
 2. Run it once. Use `Ctrl+Alt+M` or the notification-area icon to bring it into focus.
 3. To install sign-in startup and the desktop shortcut, run:
 

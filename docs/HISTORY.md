@@ -8,6 +8,7 @@ Screenshot files stay centralized under [`docs/screenshots/<version>/`](screensh
 
 | Checkpoint | Focus | Exhaustive record |
 |---|---|---|
+| 0.15.0 | Concentric orb geometry, stable hover, and edge-aware expansion | [v0.15.0](history/v0.15.0.md) |
 | 0.14.0 | Default hover-reveal orb and consistent Alt+Tab opacity | [v0.14.0](history/v0.14.0.md) |
 | 0.13.0 | Persistent pressure timeline and mode-aware Windows Snap | [v0.13.0](history/v0.13.0.md) |
 | 0.12.0 | Persistent process typography and responsive row flow | [v0.12.0](history/v0.12.0.md) |
@@ -23,10 +24,11 @@ Screenshot files stay centralized under [`docs/screenshots/<version>/`](screensh
 | 0.2.0 | Click/drag/process interaction and stable trees | [v0.2.0](history/v0.2.0.md) |
 | 0.1.0 | Initial conditional pressure companion | [v0.1.0](history/v0.1.0.md) |
 
-## Current state — 0.14.0
+## Current state — 0.15.0
 
 - Memory Bloom appears only when configured memory pressure warrants attention, with proportional compact opacity and intensity; hover temporarily makes it fully opaque.
-- The default compact style is a 92 px pressure orb. Hover grows a text capsule leftward while its circle remains fixed at the right; the original full card remains a persistent Process-screen option.
+- The default compact style is a perfectly concentric 92 px pressure orb with an exact 68 px content area for its 68 px gauge. Hover grows a text capsule inward from the nearest monitor edge while its circle remains fixed at that edge; the original full card remains a persistent Process-screen option.
+- Hover exit is debounced across the window resize, preventing transient pointer/region changes from rapidly alternating between orb and expanded states.
 - The native client background is opaque beneath whole-window pressure opacity, avoiding the split black/translucent Alt+Tab thumbnail seen when the older card was partly off-screen. The native region still provides one clean rounded outline.
 - Compact mode remains natively draggable but deliberately does not resize, maximize, or Snap. Expanded Process and History screens retain standard Windows resize/Snap behavior, Alt+Tab presence, inward monitor-edge expansion, and best-effort visibility across virtual desktops.
 - Compact mode and the detailed title bar share a dark right-click **Exit Memory Bloom** action; detailed process rows retain focus and end-process actions.
@@ -40,11 +42,11 @@ Screenshot files stay centralized under [`docs/screenshots/<version>/`](screensh
 - Historical Windows resource-exhaustion, unexpected restart/shutdown, application-crash, and error-report evidence is imported as separately styled event markers. Resource-exhaustion events include actual physical/commit levels and recorded leading processes when Windows retained them; gaps remain gaps.
 - The timeline supports presets, mouse-wheel zoom, drag panning, exact hover inspection, and a Live reset.
 
-See the [0.14.0 record](history/v0.14.0.md) for this prompt's full change and visual evidence, or use the table above for earlier iterations.
+See the [0.15.0 record](history/v0.15.0.md) for this prompt's full change and visual evidence, or use the table above for earlier iterations.
 
-## Next state — 0.15.0
+## Next state — 0.16.0
 
-- Observe the orb on both monitors and at several saved scales, then tune its resting diameter only if 92 px remains larger than necessary in ordinary work.
+- Observe the corrected orb on both monitors, particularly while crossing monitor boundaries, and tune the midpoint decision only if mixed-DPI placement exposes ambiguity.
 - Correlate a selected Windows crash or resource-exhaustion marker with the nearest Bloom samples in a dedicated incident summary.
 - Consider per-application historical series and export only after real usage shows which incident questions the aggregate timeline cannot answer.
 - Validate retention, spike sensitivity, and event density during normal sign-in operation before adding more event sources.

@@ -82,6 +82,7 @@ public partial class MainWindow : Window
     private readonly AppSettings _settings = AppSettings.Load();
     private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromSeconds(2) };
     private readonly DispatcherTimer _firefoxTimer = new() { Interval = TimeSpan.FromMilliseconds(250) };
+    private readonly DispatcherTimer _compactHoverLeaveTimer = new() { Interval = TimeSpan.FromMilliseconds(180) };
     private readonly FirefoxCompanionServer _firefoxCompanion;
     private readonly MemoryHistoryStore _history = new();
     private readonly Forms.NotifyIcon _tray;
@@ -127,6 +128,7 @@ public partial class MainWindow : Window
     private bool _surfaceDragging;
     private bool _updatingProcessFontSize;
     private bool _orbExpanded;
+    private bool _orbAnchoredLeft;
     private Point _pointerStartScreen;
     private bool _hasCompactAnchor;
     private bool _compactAnchoredRight;
@@ -158,6 +160,13 @@ public partial class MainWindow : Window
         ProcessFontSizeText.Text = $"{_settings.ProcessFontSize:0} pt";
         UpdateCompactStyleButton();
         HistoryChart.ViewChanged += (_, _) => UpdateHistorySummary();
+        _compactHoverLeaveTimer.Tick += (_, _) =>
+        {
+            _compactHoverLeaveTimer.Stop();
+            if (IsMouseOver) return;
+            SetOrbExpanded(false);
+            Opacity = _restingOpacity;
+        };
 
         _tray = new Forms.NotifyIcon
         {
@@ -968,6 +977,7 @@ public partial class MainWindow : Window
         ApplyExpandedPage();
         Shell.LayoutTransform = Transform.Identity;
         Shell.CornerRadius = new CornerRadius(22);
+        Shell.Padding = new Thickness(12);
         Topmost = false;
         ResizeMode = ResizeMode.CanResize;
         MinWidth = 760;
@@ -1108,17 +1118,34 @@ public partial class MainWindow : Window
     {
         if (UseOrbCompact)
         {
-            CompactLeftColumn.Width = _orbExpanded ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
-            CompactCenterColumn.Width = new GridLength(76);
+            Shell.Padding = new Thickness(11);
+            if (!_orbExpanded)
+            {
+                CompactLeftColumn.Width = new GridLength(68);
+                CompactCenterColumn.Width = new GridLength(0);
+                Grid.SetColumn(MinimalGauge, 0);
+            }
+            else if (_orbAnchoredLeft)
+            {
+                CompactLeftColumn.Width = new GridLength(68);
+                CompactCenterColumn.Width = new GridLength(1, GridUnitType.Star);
+                Grid.SetColumn(MinimalGauge, 0);
+            }
+            else
+            {
+                CompactLeftColumn.Width = new GridLength(1, GridUnitType.Star);
+                CompactCenterColumn.Width = new GridLength(68);
+                Grid.SetColumn(MinimalGauge, 1);
+            }
             CompactRightColumn.Width = new GridLength(0);
-            Grid.SetColumn(MinimalTextPanel, 0);
-            Grid.SetColumn(MinimalGauge, 1);
+            Grid.SetColumn(MinimalTextPanel, _orbAnchoredLeft ? 1 : 0);
             MinimalTextPanel.Visibility = _orbExpanded ? Visibility.Visible : Visibility.Collapsed;
             MinimalZoomPanel.Visibility = Visibility.Collapsed;
             Shell.CornerRadius = new CornerRadius(CompactOrbSize / 2);
         }
         else
         {
+            Shell.Padding = new Thickness(12);
             CompactLeftColumn.Width = new GridLength(76);
             CompactCenterColumn.Width = new GridLength(1, GridUnitType.Star);
             CompactRightColumn.Width = new GridLength(28);
@@ -1130,29 +1157,38 @@ public partial class MainWindow : Window
         }
     }
 
-    private void SetOrbExpanded(bool expanded)
+    private void SetOrbExpanded(bool expanded, bool? anchoredLeftOverride = null)
     {
         if (_detailed || !UseOrbCompact || _orbExpanded == expanded) return;
         var currentWidth = ActualWidth > 0 ? ActualWidth : Width;
+        var currentLeft = Left;
         var right = Left + currentWidth;
+        if (expanded)
+        {
+            var area = GetCurrentWorkArea();
+            _orbAnchoredLeft = anchoredLeftOverride ?? (currentLeft + currentWidth / 2 < area.Left + area.Width / 2);
+        }
         _orbExpanded = expanded;
         ApplyCompactPresentation();
         Width = (expanded ? CompactCardWidth : CompactOrbSize) * _settings.Scale;
         Height = CompactOrbSize * _settings.Scale;
-        Left = right - Width;
+        Left = _orbAnchoredLeft ? currentLeft : right - Width;
         ApplyNativeWindowShape();
     }
 
     private void MainWindow_MouseEnter(object sender, MouseEventArgs e)
     {
+        _compactHoverLeaveTimer.Stop();
         Opacity = 1;
         SetOrbExpanded(true);
     }
 
     private void MainWindow_MouseLeave(object sender, MouseEventArgs e)
     {
-        SetOrbExpanded(false);
-        Opacity = _restingOpacity;
+        if (!_detailed && UseOrbCompact)
+            _compactHoverLeaveTimer.Start();
+        else
+            Opacity = _restingOpacity;
     }
 
     private void ChangeScale(double delta)
@@ -1463,6 +1499,7 @@ public partial class MainWindow : Window
     {
         _timer.Stop();
         _firefoxTimer.Stop();
+        _compactHoverLeaveTimer.Stop();
         var source = PresentationSource.FromVisual(this) as HwndSource;
         if (source is not null) UnregisterHotKey(source.Handle, HotkeyId);
         _tray.Visible = false;
@@ -1630,10 +1667,15 @@ public partial class MainWindow : Window
         {
             _settings.CompactStyle = "Orb";
             SetMinimalSize();
-            SetOrbExpanded(true);
+            SetOrbExpanded(true, anchoredLeftOverride: false);
             Opacity = 1;
             UpdateLayout();
             SaveVisual(System.IO.Path.Combine(folder, "compact-hover.png"));
+            SaveVisual(System.IO.Path.Combine(folder, "compact-expand-left.png"));
+            SetOrbExpanded(false);
+            SetOrbExpanded(true, anchoredLeftOverride: true);
+            UpdateLayout();
+            SaveVisual(System.IO.Path.Combine(folder, "compact-expand-right.png"));
             SetOrbExpanded(false);
 
             _settings.CompactStyle = "Card";
