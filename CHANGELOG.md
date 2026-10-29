@@ -4,6 +4,11 @@ Concise user-visible release notes. The engineering audit is kept separately in 
 
 Dates for early releases are reconstructed from the conversation and build artifacts because Git tracking began after initial development.
 
+## 0.16.0 — 2026-10-29
+
+- Made the desktop shortcut and executable reopen the existing Bloom window when its single running instance is hidden below the pressure threshold.
+- Preserved true single-instance behavior: a relaunch signals the original process and exits without creating a duplicate monitor or history writer.
+
 ## 0.15.0 — 2026-10-25
 
 - Corrected the orb's usable geometry so the shell, gauge, pulse, and percentage are perfectly concentric without a clipped vertical edge.

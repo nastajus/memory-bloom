@@ -45,6 +45,7 @@ Windows does not retain a continuous historical RAM graph by default, so Bloom d
 - Brings a process window forward on double-click and offers dark right-click focus/end actions.
 - Reconciles physical RAM not represented by process working sets into file cache, kernel pools, and other shared/OS memory.
 - Starts at sign-in, lives in the notification area, and creates a desktop launcher.
+- Reusing the executable or desktop launcher while Bloom is hidden brings the existing instance into view instead of silently exiting or starting a duplicate monitor.
 
 ## Firefox investigation
 
@@ -71,7 +72,7 @@ The companion is necessary for a prompt, complete catalog of open tabs. Without 
 
 Memory Bloom currently targets Windows 11 and the .NET 10 Desktop Runtime.
 
-1. Download [MemoryBloom.exe](docs/releases/v0.15.0/MemoryBloom.exe), or build it locally.
+1. Download [MemoryBloom.exe](docs/releases/v0.16.0/MemoryBloom.exe), or build it locally.
 2. Run it once. Use `Ctrl+Alt+M` or the notification-area icon to bring it into focus.
 3. To install sign-in startup and the desktop shortcut, run:
 
@@ -100,6 +101,7 @@ The build is written to `release\MemoryBloom.exe`. Settings are stored under `%L
 - Double-click a process to bring its window forward.
 - Right-click a process for **Bring to front** and **End process…**.
 - Press `Ctrl+Alt+M` or double-click the tray icon to show details.
+- Launch the desktop shortcut again at any time to reveal the already-running instance.
 
 ## Privacy and limitations
 

@@ -955,6 +955,8 @@ public partial class MainWindow : Window
 
     private void ShowDetails() => ShowDetails(activate: true);
 
+    internal void ShowFromExternalLaunch() => ShowDetails();
+
     private void ShowDetails(bool activate)
     {
         var enteringFromCompact = !_detailed;
