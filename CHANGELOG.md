@@ -4,6 +4,12 @@ Concise user-visible release notes. The engineering audit is kept separately in 
 
 Dates for early releases are reconstructed from the conversation and build artifacts because Git tracking began after initial development.
 
+## 0.18.0 — 2026-10-29
+
+- Changed `Ctrl+Alt+B` into a compact visibility-policy toggle between **Always visible** and **Threshold controlled**; it no longer opens the full investigator.
+- Added in-app policy/countdown feedback and a configurable 5/15/30/60-minute or until-toggled automatic return to threshold control, defaulting to 15 minutes.
+- Added the same visibility toggle to the tray menu while retaining the tray icon as a conventional hidden-window recovery and exit path.
+
 ## 0.17.0 — 2026-10-29
 
 - Made the compact control the four-way reference anchor for Process and History: expanded views now grow inward from the nearest horizontal and vertical monitor edges.

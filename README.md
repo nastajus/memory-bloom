@@ -45,6 +45,8 @@ Windows does not retain a continuous historical RAM graph by default, so Bloom d
 - Brings a process window forward on double-click and offers dark right-click focus/end actions.
 - Reconciles physical RAM not represented by process working sets into file cache, kernel pools, and other shared/OS memory.
 - Starts at sign-in, lives in the notification area, and creates a desktop launcher.
+- Uses `Ctrl+Alt+B` to toggle the compact signal between **Always visible** and normal **Threshold controlled** behavior without opening the full investigator.
+- Returns temporary always-visible mode to threshold control after a configurable timeout (15 minutes by default), with compact and title-bar feedback.
 - Reusing the executable or desktop launcher while Bloom is hidden brings the existing instance into view instead of silently exiting or starting a duplicate monitor.
 
 ## Firefox investigation
@@ -72,8 +74,8 @@ The companion is necessary for a prompt, complete catalog of open tabs. Without 
 
 Memory Bloom currently targets Windows 11 and the .NET 10 Desktop Runtime.
 
-1. Download [MemoryBloom.exe](docs/releases/v0.17.0/MemoryBloom.exe), or build it locally.
-2. Run it once. Use `Ctrl+Alt+M` or the notification-area icon to bring it into focus.
+1. Download [MemoryBloom.exe](docs/releases/v0.18.0/MemoryBloom.exe), or build it locally.
+2. Run it once. Use `Ctrl+Alt+B` to toggle the compact signal between always visible and threshold controlled; use the notification-area icon or desktop launcher for the full investigator.
 3. To install sign-in startup and the desktop shortcut, run:
 
 ```powershell
@@ -96,11 +98,13 @@ The build is written to `release\MemoryBloom.exe`. Settings are stored under `%L
 - In History, hover for exact readings and top-process context, wheel to zoom, drag to pan, use the range presets, and double-click or choose **Live** to return to now.
 - Use Ctrl + mouse wheel to scale either compact style; the full-card option also shows `+` / `−` buttons.
 - Use **Compact** at the bottom-right of Processes to switch persistently between **Circle · text on hover** and **Full card**.
+- Press `Ctrl+Alt+B` to toggle **Always visible** / **Threshold controlled**. This changes visibility only and never opens the investigator.
+- Choose **Visible for** in Processes to return Always visible to threshold control after 5, 15, 30, or 60 minutes, or keep it active until toggled. Each app start begins threshold-controlled.
 - Right-click either the compact view or the detailed title bar and choose **Exit Memory Bloom** to quit.
 - Use the detailed view's **Text size** slider to resize process and Firefox tab text from 10–18 pt; the choice persists.
 - Double-click a process to bring its window forward.
 - Right-click a process for **Bring to front** and **End process…**.
-- Press `Ctrl+Alt+M` or double-click the tray icon to show details.
+- Double-click the tray icon to show details; its menu also toggles visibility, opens either investigator page, hides until pressure rises, or exits.
 - Launch the desktop shortcut again at any time to reveal the already-running instance.
 
 ## Privacy and limitations

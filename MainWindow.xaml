@@ -38,7 +38,7 @@
                 <StackPanel x:Name="MinimalTextPanel" Grid.Column="1" VerticalAlignment="Center" Margin="7,0,4,0">
                     <TextBlock x:Name="PressureTagline" Text="Memory is getting busy" Foreground="{StaticResource TextPrimary}" FontSize="14" FontWeight="SemiBold"/>
                     <TextBlock x:Name="SummaryText" Text="Checking pressure…" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,4,0,0"/>
-                    <TextBlock Text="Click for details" Foreground="#FF75D6B2" FontSize="10" Margin="0,4,0,0"/>
+                    <TextBlock x:Name="CompactHintText" Text="Click for details · Ctrl+Alt+B" Foreground="#FF75D6B2" FontSize="10" Margin="0,4,0,0"/>
                 </StackPanel>
                 <StackPanel x:Name="MinimalZoomPanel" Grid.Column="2" VerticalAlignment="Center">
                     <Button Click="ZoomIn_Click" ToolTip="Make larger" Padding="3,0" FontSize="14">+</Button>
@@ -58,9 +58,11 @@
                     <StackPanel Orientation="Horizontal">
                         <Ellipse x:Name="HeaderDot" Width="11" Height="11" Fill="#FF75D6B2" Margin="2,0,9,0"/>
                         <TextBlock Text="MEMORY BLOOM" Foreground="{StaticResource TextMuted}" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="VisibilityModeText" Text="THRESHOLD" Foreground="#FF75D6B2" FontSize="10"
+                                   VerticalAlignment="Center" Margin="12,0,0,0"/>
                     </StackPanel>
                     <TextBlock x:Name="LoadingText" Text="Refreshing…" Foreground="{StaticResource TextMuted}" FontSize="10"
-                               Margin="145,0,0,0" VerticalAlignment="Center" Visibility="Collapsed"/>
+                               Margin="280,0,0,0" VerticalAlignment="Center" Visibility="Collapsed"/>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                         <Button x:Name="PageSwitchButton" Click="PageSwitch_Click" ToolTip="Switch between process and memory history">History</Button>
                         <Button x:Name="FirefoxProcessesButton" Click="OpenFirefoxProcesses_Click" ToolTip="Open Firefox's exact tab/process view">Firefox tabs ↗</Button>
@@ -103,8 +105,16 @@
                     </StackPanel>
                     <TextBlock x:Name="SelectionText" Grid.Column="1" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"
                                Margin="8,0" TextTrimming="CharacterEllipsis"/>
-                    <StackPanel Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center" MinWidth="226">
-                        <Grid Margin="0,0,0,2">
+                    <Grid Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center" MinWidth="454">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="26"/>
+                            <RowDefinition Height="26"/>
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="218"/>
+                            <ColumnDefinition Width="236"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid Margin="0,0,8,2">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="62"/>
                                 <ColumnDefinition Width="112"/>
@@ -116,7 +126,7 @@
                                     ToolTip="Adjust process and Firefox tab text"/>
                             <TextBlock x:Name="ProcessFontSizeText" Grid.Column="2" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
                         </Grid>
-                        <Grid>
+                        <Grid Grid.Column="1" Margin="8,0,0,2">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="62"/>
                                 <ColumnDefinition Width="112"/>
@@ -126,17 +136,33 @@
                             <Slider x:Name="ThresholdSlider" Grid.Column="1" Minimum="65" Maximum="95" Margin="7,0" ValueChanged="ThresholdSlider_ValueChanged"/>
                             <TextBlock x:Name="ThresholdText" Grid.Column="2" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
                         </Grid>
-                        <Grid Margin="0,2,0,0">
+                        <Grid Grid.Row="1" Margin="0,2,8,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="62"/>
                                 <ColumnDefinition Width="156"/>
                                 <ColumnDefinition Width="8"/>
                             </Grid.ColumnDefinitions>
                             <TextBlock Text="Compact" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
-                            <Button x:Name="CompactStyleButton" Grid.Column="1" Click="CompactStyle_Click" Margin="7,1,0,1" Padding="7,3"
+                            <Button x:Name="CompactStyleButton" Grid.Column="1" Click="CompactStyle_Click" Margin="7,1,0,1" Padding="7,1" Height="24"
                                     ToolTip="Choose a circle that reveals text on hover or the original full card">Circle · text on hover</Button>
                         </Grid>
-                    </StackPanel>
+                        <Grid Grid.Row="1" Grid.Column="1" Margin="8,2,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="70"/>
+                                <ColumnDefinition Width="148"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Visible for" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                            <ComboBox x:Name="VisibilityTimeoutComboBox" Grid.Column="1" Margin="7,1,0,1" Padding="5,1" Height="24"
+                                      SelectionChanged="VisibilityTimeoutComboBox_SelectionChanged"
+                                      ToolTip="How long Ctrl+Alt+B keeps Bloom visible before returning to threshold control">
+                                <ComboBoxItem Content="5 minutes" Tag="5"/>
+                                <ComboBoxItem Content="15 minutes" Tag="15"/>
+                                <ComboBoxItem Content="30 minutes" Tag="30"/>
+                                <ComboBoxItem Content="1 hour" Tag="60"/>
+                                <ComboBoxItem Content="Until toggled" Tag="0"/>
+                            </ComboBox>
+                        </Grid>
+                    </Grid>
                 </Grid>
 
                 <Grid x:Name="HistoryPage" Grid.Row="1" Grid.RowSpan="3" Visibility="Collapsed" Margin="0,8,0,0">

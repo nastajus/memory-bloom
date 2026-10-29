@@ -12,6 +12,7 @@ internal sealed class AppSettings
     public double HideBelowPercent { get; set; } = 72;
     public double Scale { get; set; } = 1.0;
     public double ProcessFontSize { get; set; } = 13.0;
+    public int VisibilityTimeoutMinutes { get; set; } = 15;
     public string CompactStyle { get; set; } = "Orb";
     public bool OrbLocationMigrated { get; set; }
     public double Left { get; set; } = double.NaN;

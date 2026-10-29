@@ -35,7 +35,7 @@ public partial class MainWindow : Window
     private const int HotkeyId = 0xB100;
     private const uint ModAlt = 0x0001;
     private const uint ModControl = 0x0002;
-    private const uint VkM = 0x4D;
+    private const uint VkB = 0x42;
 
     [DllImport("user32.dll")] private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint modifiers, uint key);
     [DllImport("user32.dll")] private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
@@ -83,6 +83,7 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromSeconds(2) };
     private readonly DispatcherTimer _firefoxTimer = new() { Interval = TimeSpan.FromMilliseconds(250) };
     private readonly DispatcherTimer _compactHoverLeaveTimer = new() { Interval = TimeSpan.FromMilliseconds(180) };
+    private readonly DispatcherTimer _visibilityModeTimer = new() { Interval = TimeSpan.FromSeconds(1) };
     private readonly FirefoxCompanionServer _firefoxCompanion;
     private readonly MemoryHistoryStore _history = new();
     private readonly Forms.NotifyIcon _tray;
@@ -115,6 +116,10 @@ public partial class MainWindow : Window
     private ProcessSnapshot? _selectedProcess;
     private bool _detailed;
     private bool _manualOpen;
+    private bool _alwaysVisible;
+    private DateTime? _alwaysVisibleUntilUtc;
+    private DateTime? _visibilityFeedbackUntilUtc;
+    private string _visibilityFeedbackMessage = "";
     private bool _exiting;
     private bool _processRefreshRunning;
     private bool _historyContextRefreshRunning;
@@ -160,15 +165,20 @@ public partial class MainWindow : Window
         ProcessTree.FontSize = _settings.ProcessFontSize;
         ProcessFontSizeSlider.Value = _settings.ProcessFontSize;
         ProcessFontSizeText.Text = $"{_settings.ProcessFontSize:0} pt";
+        _settings.VisibilityTimeoutMinutes = NormalizeVisibilityTimeout(_settings.VisibilityTimeoutMinutes);
+        VisibilityTimeoutComboBox.SelectedItem = VisibilityTimeoutComboBox.Items.OfType<ComboBoxItem>()
+            .First(item => int.Parse((string)item.Tag, CultureInfo.InvariantCulture) == _settings.VisibilityTimeoutMinutes);
         UpdateCompactStyleButton();
+        UpdateVisibilityModeUi();
         HistoryChart.ViewChanged += (_, _) => UpdateHistorySummary();
         _compactHoverLeaveTimer.Tick += (_, _) =>
         {
             _compactHoverLeaveTimer.Stop();
-            if (IsMouseOver) return;
+            if (IsMouseOver || IsVisibilityFeedbackActive) return;
             SetOrbExpanded(false);
             Opacity = _restingOpacity;
         };
+        _visibilityModeTimer.Tick += (_, _) => VisibilityModeTimer_Tick();
 
         _tray = new Forms.NotifyIcon
         {
@@ -266,6 +276,18 @@ public partial class MainWindow : Window
 
     private void EvaluateVisibility(double pressure)
     {
+        if (_alwaysVisible)
+        {
+            _quietTicks = 0;
+            if (!IsVisible)
+            {
+                SetMinimalSize();
+                PositionAtEdgeIfNeeded();
+                Show();
+            }
+            return;
+        }
+        if (IsVisibilityFeedbackActive) return;
         if (_manualOpen || _detailed) return;
 
         if (pressure >= _settings.ShowAtPercent)
@@ -1135,10 +1157,16 @@ public partial class MainWindow : Window
 
     private void HideUntilPressure()
     {
+        _alwaysVisible = false;
+        _alwaysVisibleUntilUtc = null;
+        _visibilityFeedbackUntilUtc = null;
+        _visibilityFeedbackMessage = "";
+        _visibilityModeTimer.Stop();
         _manualOpen = false;
         _detailed = false;
         DetailedView.Visibility = Visibility.Collapsed;
         MinimalView.Visibility = Visibility.Visible;
+        UpdateVisibilityModeUi();
         Hide();
     }
 
@@ -1227,11 +1255,128 @@ public partial class MainWindow : Window
 
     private void MainWindow_MouseLeave(object sender, MouseEventArgs e)
     {
-        if (!_detailed && UseOrbCompact)
+        if (!_detailed && UseOrbCompact && !IsVisibilityFeedbackActive)
             _compactHoverLeaveTimer.Start();
         else
             Opacity = _restingOpacity;
     }
+
+    private bool IsVisibilityFeedbackActive =>
+        _visibilityFeedbackUntilUtc is DateTime until && until > DateTime.UtcNow;
+
+    private static int NormalizeVisibilityTimeout(int minutes) =>
+        minutes is 0 or 5 or 15 or 30 or 60 ? minutes : 15;
+
+    private void ToggleVisibilityPolicy()
+    {
+        if (_alwaysVisible)
+        {
+            _alwaysVisible = false;
+            _alwaysVisibleUntilUtc = null;
+            _manualOpen = false;
+            ShowVisibilityFeedback("Threshold controlled");
+        }
+        else
+        {
+            _alwaysVisible = true;
+            _manualOpen = false;
+            ResetAlwaysVisibleTimeout();
+            var duration = _settings.VisibilityTimeoutMinutes == 0
+                ? "until toggled"
+                : $"for {FormatVisibilityDuration(_settings.VisibilityTimeoutMinutes)}";
+            ShowVisibilityFeedback($"Always visible {duration}");
+        }
+    }
+
+    private void ResetAlwaysVisibleTimeout()
+    {
+        _alwaysVisibleUntilUtc = _settings.VisibilityTimeoutMinutes > 0
+            ? DateTime.UtcNow.AddMinutes(_settings.VisibilityTimeoutMinutes)
+            : null;
+    }
+
+    private void ShowVisibilityFeedback(string message)
+    {
+        _visibilityFeedbackMessage = message;
+        _visibilityFeedbackUntilUtc = DateTime.UtcNow.AddSeconds(3);
+        if (!IsVisible)
+        {
+            SetMinimalSize();
+            PositionAtEdgeIfNeeded();
+            Show();
+        }
+        if (!_detailed && UseOrbCompact) SetOrbExpanded(true);
+        UpdateVisibilityModeUi();
+        _visibilityModeTimer.Start();
+    }
+
+    private void VisibilityModeTimer_Tick()
+    {
+        var now = DateTime.UtcNow;
+        if (_alwaysVisible && _alwaysVisibleUntilUtc is DateTime expiry && expiry <= now)
+        {
+            _alwaysVisible = false;
+            _alwaysVisibleUntilUtc = null;
+            _manualOpen = false;
+            ShowVisibilityFeedback("Threshold restored · timeout");
+            return;
+        }
+
+        if (_visibilityFeedbackUntilUtc is DateTime feedbackExpiry && feedbackExpiry <= now)
+        {
+            _visibilityFeedbackUntilUtc = null;
+            _visibilityFeedbackMessage = "";
+            if (!_detailed && UseOrbCompact && !IsMouseOver) SetOrbExpanded(false);
+            if (!_alwaysVisible && !_detailed && _reading is not null)
+            {
+                _quietTicks = 4;
+                EvaluateVisibility(_reading.PressurePercent);
+            }
+        }
+
+        UpdateVisibilityModeUi();
+        if (!_alwaysVisible && !IsVisibilityFeedbackActive) _visibilityModeTimer.Stop();
+    }
+
+    private void UpdateVisibilityModeUi()
+    {
+        if (VisibilityModeText is null || CompactHintText is null) return;
+        var now = DateTime.UtcNow;
+        string mode;
+        if (_alwaysVisible)
+        {
+            mode = _alwaysVisibleUntilUtc is DateTime expiry
+                ? $"ALWAYS · {FormatRemaining(expiry - now)}"
+                : "ALWAYS · UNTIL TOGGLED";
+        }
+        else
+        {
+            mode = "THRESHOLD";
+        }
+
+        VisibilityModeText.Text = IsVisibilityFeedbackActive
+            ? _visibilityFeedbackMessage.ToUpperInvariant()
+            : mode;
+        CompactHintText.Text = IsVisibilityFeedbackActive
+            ? _visibilityFeedbackMessage
+            : _alwaysVisible
+                ? $"{ToTitleCase(mode)} · Ctrl+Alt+B"
+                : "Click for details · Ctrl+Alt+B";
+        VisibilityModeText.ToolTip = "Ctrl+Alt+B toggles Always visible and Threshold controlled";
+    }
+
+    private static string FormatRemaining(TimeSpan remaining)
+    {
+        if (remaining <= TimeSpan.Zero) return "ending";
+        if (remaining.TotalMinutes >= 60) return $"{Math.Ceiling(remaining.TotalHours):0}h";
+        return $"{Math.Ceiling(remaining.TotalMinutes):0}m";
+    }
+
+    private static string FormatVisibilityDuration(int minutes) =>
+        minutes == 60 ? "1 hour" : $"{minutes} minutes";
+
+    private static string ToTitleCase(string value) =>
+        CultureInfo.CurrentCulture.TextInfo.ToTitleCase(value.ToLower(CultureInfo.CurrentCulture));
 
     private void ChangeScale(double delta)
     {
@@ -1454,7 +1599,7 @@ public partial class MainWindow : Window
     {
         var source = (HwndSource)PresentationSource.FromVisual(this);
         source.AddHook(WindowHook);
-        RegisterHotKey(source.Handle, HotkeyId, ModControl | ModAlt, VkM);
+        RegisterHotKey(source.Handle, HotkeyId, ModControl | ModAlt, VkB);
     }
 
     private void ApplyNativeWindowShape()
@@ -1501,7 +1646,7 @@ public partial class MainWindow : Window
         }
         if (message == 0x0312 && wParam.ToInt32() == HotkeyId)
         {
-            ShowDetails();
+            ToggleVisibilityPolicy();
             handled = true;
         }
         return IntPtr.Zero;
@@ -1510,6 +1655,8 @@ public partial class MainWindow : Window
     private Forms.ContextMenuStrip BuildTrayMenu()
     {
         var menu = new Forms.ContextMenuStrip();
+        menu.Items.Add("Toggle always visible (Ctrl+Alt+B)", null, (_, _) => Dispatcher.Invoke(ToggleVisibilityPolicy));
+        menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add("Show details", null, (_, _) => Dispatcher.Invoke(ShowDetails));
         menu.Items.Add("Show history", null, (_, _) => Dispatcher.Invoke(ShowHistoryPage));
         menu.Items.Add("Show compact", null, (_, _) => Dispatcher.Invoke(() => ShowMinimal(manual: true)));
@@ -1542,6 +1689,7 @@ public partial class MainWindow : Window
         _timer.Stop();
         _firefoxTimer.Stop();
         _compactHoverLeaveTimer.Stop();
+        _visibilityModeTimer.Stop();
         var source = PresentationSource.FromVisual(this) as HwndSource;
         if (source is not null) UnregisterHotKey(source.Handle, HotkeyId);
         _tray.Visible = false;
@@ -1608,6 +1756,22 @@ public partial class MainWindow : Window
             ShowMinimal(manual: true);
             UpdateLayout();
             SaveVisual(System.IO.Path.Combine(folder, "minimal.png"));
+            _alwaysVisible = true;
+            ResetAlwaysVisibleTimeout();
+            _visibilityFeedbackMessage = _settings.VisibilityTimeoutMinutes == 0
+                ? "Always visible until toggled"
+                : $"Always visible for {FormatVisibilityDuration(_settings.VisibilityTimeoutMinutes)}";
+            _visibilityFeedbackUntilUtc = DateTime.UtcNow.AddMinutes(1);
+            if (UseOrbCompact) SetOrbExpanded(true);
+            UpdateVisibilityModeUi();
+            UpdateLayout();
+            SaveVisual(System.IO.Path.Combine(folder, "visibility-toggle.png"));
+            _alwaysVisible = false;
+            _alwaysVisibleUntilUtc = null;
+            _visibilityFeedbackUntilUtc = null;
+            _visibilityFeedbackMessage = "";
+            if (UseOrbCompact) SetOrbExpanded(false);
+            UpdateVisibilityModeUi();
             CaptureSurfaceMenuPreview(MinimalView, System.IO.Path.Combine(folder, "compact-context-menu.png"), overlayOnWindow: false);
             CaptureCompactVariants(folder);
             CapturePressureTierPreviews(folder);
@@ -1875,6 +2039,24 @@ public partial class MainWindow : Window
         _settings.HideBelowPercent = Math.Max(60, _settings.ShowAtPercent - 6);
         ThresholdText.Text = $"{_settings.ShowAtPercent:0}%";
         _settings.Save();
+    }
+
+    private void VisibilityTimeoutComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_ready || VisibilityTimeoutComboBox.SelectedItem is not ComboBoxItem item) return;
+        if (!int.TryParse((string)item.Tag, NumberStyles.Integer, CultureInfo.InvariantCulture, out var minutes)) return;
+        _settings.VisibilityTimeoutMinutes = NormalizeVisibilityTimeout(minutes);
+        _settings.Save();
+        if (_alwaysVisible)
+        {
+            ResetAlwaysVisibleTimeout();
+            var duration = minutes == 0 ? "until toggled" : $"for {FormatVisibilityDuration(minutes)}";
+            ShowVisibilityFeedback($"Always visible {duration}");
+        }
+        else
+        {
+            UpdateVisibilityModeUi();
+        }
     }
 
     private void ProcessFontSizeSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
