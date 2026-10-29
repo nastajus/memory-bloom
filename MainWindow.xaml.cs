@@ -132,9 +132,11 @@ public partial class MainWindow : Window
     private Point _pointerStartScreen;
     private bool _hasCompactAnchor;
     private bool _compactAnchoredRight;
+    private bool _compactAnchoredBottom;
     private double _compactLeft;
     private double _compactRight;
     private double _compactTop;
+    private double _compactBottom;
     private Rect _compactWorkArea;
     private bool UseOrbCompact => !_settings.CompactStyle.Equals("Card", StringComparison.OrdinalIgnoreCase);
 
@@ -963,11 +965,15 @@ public partial class MainWindow : Window
         if (enteringFromCompact)
         {
             _compactWorkArea = GetCurrentWorkArea();
-            var compactWidth = ActualWidth > 0 ? ActualWidth : Width;
-            _compactLeft = Left;
-            _compactRight = Left + compactWidth;
+            var displayedWidth = ActualWidth > 0 ? ActualWidth : Width;
+            var compactHeight = ActualHeight > 0 ? ActualHeight : Height;
+            var compactWidth = UseOrbCompact ? CompactOrbSize * _settings.Scale : displayedWidth;
+            _compactLeft = UseOrbCompact && !_orbAnchoredLeft ? Left + displayedWidth - compactWidth : Left;
+            _compactRight = _compactLeft + compactWidth;
             _compactTop = Top;
-            _compactAnchoredRight = Left + compactWidth / 2 >= _compactWorkArea.Left + _compactWorkArea.Width / 2;
+            _compactBottom = Top + compactHeight;
+            _compactAnchoredRight = _compactLeft + compactWidth / 2 >= _compactWorkArea.Left + _compactWorkArea.Width / 2;
+            _compactAnchoredBottom = Top + compactHeight / 2 >= _compactWorkArea.Top + _compactWorkArea.Height / 2;
             _hasCompactAnchor = true;
         }
 
@@ -982,16 +988,33 @@ public partial class MainWindow : Window
         Shell.Padding = new Thickness(12);
         Topmost = false;
         ResizeMode = ResizeMode.CanResize;
-        MinWidth = 760;
-        MinHeight = 430;
-        Width = Math.Max(780, Width);
-        Height = Math.Max(600, Height);
+        MinWidth = Math.Min(760, _compactWorkArea.Width);
+        MinHeight = Math.Min(430, _compactWorkArea.Height);
+        Width = Math.Min(Math.Max(780, Width), _compactWorkArea.Width);
+        Height = Math.Min(Math.Max(600, Height), _compactWorkArea.Height);
         if (enteringFromCompact)
         {
-            Left = _compactAnchoredRight
-                ? Math.Max(_compactWorkArea.Left, _compactRight - Width)
-                : Math.Min(_compactLeft, _compactWorkArea.Right - Width);
-            Top = Math.Clamp(_compactTop, _compactWorkArea.Top, Math.Max(_compactWorkArea.Top, _compactWorkArea.Bottom - Height));
+            if (_settings.ExpandedPositionUserSet &&
+                _settings.ExpandedLeft is double savedLeft &&
+                _settings.ExpandedTop is double savedTop &&
+                double.IsFinite(savedLeft) &&
+                double.IsFinite(savedTop) &&
+                IsExpandedPositionReachable(savedLeft, savedTop, Width, Height, _compactWorkArea))
+            {
+                Left = savedLeft;
+                Top = savedTop;
+            }
+            else
+            {
+                PositionExpandedFromCompactAnchor();
+                if (_settings.ExpandedPositionUserSet && !_previewMode)
+                {
+                    _settings.ExpandedPositionUserSet = false;
+                    _settings.ExpandedLeft = null;
+                    _settings.ExpandedTop = null;
+                    _settings.Save();
+                }
+            }
         }
         _restingOpacity = 0.98;
         Opacity = IsMouseOver ? 1 : _restingOpacity;
@@ -1001,6 +1024,22 @@ public partial class MainWindow : Window
         ShowActivated = true;
         Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(ApplyNativeWindowShape));
         _ = RefreshProcessesAsync();
+    }
+
+    private void PositionExpandedFromCompactAnchor()
+    {
+        var desiredLeft = _compactAnchoredRight ? _compactRight - Width : _compactLeft;
+        var desiredTop = _compactAnchoredBottom ? _compactBottom - Height : _compactTop;
+        Left = Math.Clamp(desiredLeft, _compactWorkArea.Left, Math.Max(_compactWorkArea.Left, _compactWorkArea.Right - Width));
+        Top = Math.Clamp(desiredTop, _compactWorkArea.Top, Math.Max(_compactWorkArea.Top, _compactWorkArea.Bottom - Height));
+    }
+
+    private static bool IsExpandedPositionReachable(double left, double top, double width, double height, Rect workArea)
+    {
+        var visible = Rect.Intersect(new Rect(left, top, width, height), workArea);
+        return !visible.IsEmpty &&
+            visible.Width >= Math.Min(160, width) &&
+            visible.Height >= Math.Min(50, height);
     }
 
     private void ApplyExpandedPage()
@@ -1082,7 +1121,8 @@ public partial class MainWindow : Window
         {
             Left = _compactAnchoredRight ? _compactRight - Width : _compactLeft;
             Left = Math.Clamp(Left, _compactWorkArea.Left, Math.Max(_compactWorkArea.Left, _compactWorkArea.Right - Width));
-            Top = Math.Clamp(_compactTop, _compactWorkArea.Top, Math.Max(_compactWorkArea.Top, _compactWorkArea.Bottom - Height));
+            Top = _compactAnchoredBottom ? _compactBottom - Height : _compactTop;
+            Top = Math.Clamp(Top, _compactWorkArea.Top, Math.Max(_compactWorkArea.Top, _compactWorkArea.Bottom - Height));
         }
         else
         {
@@ -1790,8 +1830,22 @@ public partial class MainWindow : Window
     private void SaveLocationIfReady()
     {
         if (!_ready || WindowState != WindowState.Normal || !IsVisible) return;
-        _settings.Left = Left;
-        _settings.Top = Top;
+        if (_detailed)
+        {
+            _settings.ExpandedPositionUserSet = true;
+            _settings.ExpandedLeft = Left;
+            _settings.ExpandedTop = Top;
+        }
+        else
+        {
+            var displayedWidth = ActualWidth > 0 ? ActualWidth : Width;
+            var compactWidth = UseOrbCompact ? CompactOrbSize * _settings.Scale : displayedWidth;
+            _settings.Left = UseOrbCompact && !_orbAnchoredLeft ? Left + displayedWidth - compactWidth : Left;
+            _settings.Top = Top;
+            _settings.ExpandedPositionUserSet = false;
+            _settings.ExpandedLeft = null;
+            _settings.ExpandedTop = null;
+        }
         _settings.Save();
     }
 

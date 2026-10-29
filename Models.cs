@@ -16,6 +16,9 @@ internal sealed class AppSettings
     public bool OrbLocationMigrated { get; set; }
     public double Left { get; set; } = double.NaN;
     public double Top { get; set; } = double.NaN;
+    public bool ExpandedPositionUserSet { get; set; }
+    public double? ExpandedLeft { get; set; }
+    public double? ExpandedTop { get; set; }
 
     private static string Folder => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MemoryBloom");

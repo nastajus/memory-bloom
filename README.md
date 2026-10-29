@@ -16,7 +16,7 @@ The default primary view is now a pressure orb: only the circle remains at rest,
 
 ## Expanded when you need an explanation
 
-A click opens the resizable investigator inward from the nearest monitor edge. It shows physical and committed memory, groups processes by application, and reconciles cache, kernel pools, and other shared Windows memory that ordinary per-process totals omit. Switch to **History** for a persistent, interactive pressure timeline.
+A click opens the resizable investigator inward from the compact control's nearest horizontal and vertical monitor edges. A compact control near the bottom-right therefore keeps the expanded screen's bottom-right edge aligned while it grows up and left. Automatic placement remains fully on-screen; dragging an expanded screen elsewhere remembers that intentional position across restarts, while moving the compact control establishes a new anchor. The investigator shows physical and committed memory, groups processes by application, and reconciles cache, kernel pools, and other shared Windows memory that ordinary per-process totals omit. Switch to **History** for a persistent, interactive pressure timeline.
 
 ![Memory Bloom expanded process view with text-size, alert, and History controls](docs/screenshots/v0.13.0/detailed.png)
 
@@ -35,7 +35,7 @@ Windows does not retain a continuous historical RAM graph by default, so Bloom d
 - Appears automatically at a configurable pressure threshold and hides again with hysteresis.
 - Makes its color, glow, gauge, and uniform whole-window opacity more intense as pressure rises, including in Windows' Alt+Tab representation.
 - Becomes fully opaque while hovered, then returns to its pressure-based opacity when the pointer leaves.
-- Switches between a small compact view, a detailed process investigator, and an interactive memory-history timeline; expanded modes grow inward from whichever half of the monitor holds the compact view.
+- Switches between a small compact view, a detailed process investigator, and an interactive memory-history timeline; expanded modes grow inward from the compact control's nearest left/right and top/bottom edges.
 - Defaults to a concentric 92 px pressure orb whose text expands inward from the nearest monitor edge; the original full compact card is a persistent setting in Processes.
 - Keeps compact mode freely draggable but non-snapping; expanded Process and History screens use normal Windows resizing and Snap behavior, including the top-edge maximize preview.
 - Records a 30-day local history with spike/critical/recovery flags, periodic top-process context, and clearly separate Windows incident backfill.
@@ -72,7 +72,7 @@ The companion is necessary for a prompt, complete catalog of open tabs. Without 
 
 Memory Bloom currently targets Windows 11 and the .NET 10 Desktop Runtime.
 
-1. Download [MemoryBloom.exe](docs/releases/v0.16.0/MemoryBloom.exe), or build it locally.
+1. Download [MemoryBloom.exe](docs/releases/v0.17.0/MemoryBloom.exe), or build it locally.
 2. Run it once. Use `Ctrl+Alt+M` or the notification-area icon to bring it into focus.
 3. To install sign-in startup and the desktop shortcut, run:
 

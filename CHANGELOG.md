@@ -4,6 +4,12 @@ Concise user-visible release notes. The engineering audit is kept separately in 
 
 Dates for early releases are reconstructed from the conversation and build artifacts because Git tracking began after initial development.
 
+## 0.17.0 — 2026-10-29
+
+- Made the compact control the four-way reference anchor for Process and History: expanded views now grow inward from the nearest horizontal and vertical monitor edges.
+- Kept default expanded windows fully inside the compact control's monitor, including when the compact control itself is partly off-screen.
+- Remembered a deliberately dragged expanded position across restarts while letting a later compact move establish a fresh automatic anchor.
+
 ## 0.16.0 — 2026-10-29
 
 - Made the desktop shortcut and executable reopen the existing Bloom window when its single running instance is hidden below the pressure threshold.
