@@ -20,7 +20,7 @@ public partial class App : System.Windows.Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
-        SetCurrentProcessExplicitAppUserModelID("MemoryBloom.App");
+        SetCurrentProcessExplicitAppUserModelID(VirtualDesktopPinning.AppUserModelId);
         var previewIndex = Array.FindIndex(e.Args, value => value.Equals("--preview", StringComparison.OrdinalIgnoreCase));
         var previewFolder = previewIndex >= 0 && previewIndex + 1 < e.Args.Length ? e.Args[previewIndex + 1] : null;
         if (previewFolder is null)

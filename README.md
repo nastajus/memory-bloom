@@ -39,7 +39,7 @@ Windows does not retain a continuous historical RAM graph by default, so Bloom d
 - Defaults to a concentric 92 px pressure orb whose text expands inward from the nearest monitor edge; the original full compact card is a persistent setting in Processes.
 - Keeps compact mode freely draggable but non-snapping; expanded Process and History screens use normal Windows resizing and Snap behavior, including the top-edge maximize preview.
 - Records a 30-day local history with spike/critical/recovery flags, periodic top-process context, and clearly separate Windows incident backfill.
-- Appears in Alt+Tab with its own icon and pins its window across Windows virtual desktops.
+- Appears in Alt+Tab with its own icon and self-heals its Windows virtual-desktop pin after reveals and shell-state loss.
 - Preserves collapsed process branches across refreshes.
 - Sorts app child processes and Firefox tab-host candidates by private memory, largest first.
 - Brings a process window forward on double-click and offers dark right-click focus/end actions.
@@ -74,7 +74,7 @@ The companion is necessary for a prompt, complete catalog of open tabs. Without 
 
 Memory Bloom currently targets Windows 11 and the .NET 10 Desktop Runtime.
 
-1. Download [MemoryBloom.exe](docs/releases/v0.18.0/MemoryBloom.exe), or build it locally.
+1. Download [MemoryBloom.exe](docs/releases/v0.19.0/MemoryBloom.exe), or build it locally.
 2. Run it once. Use `Ctrl+Alt+B` to toggle the compact signal between always visible and threshold controlled; use the notification-area icon or desktop launcher for the full investigator.
 3. To install sign-in startup and the desktop shortcut, run:
 
@@ -111,6 +111,6 @@ The build is written to `release\MemoryBloom.exe`. Settings are stored under `%L
 
 All memory, process, Firefox recovery, and Windows Event Log data is read locally. Memory Bloom sends no telemetry and does not upload browsing data. Durable timeline samples are kept in `%LOCALAPPDATA%\MemoryBloom\memory-history.jsonl`; recent high-resolution points are retained for seven days, older normal points are compacted to five-minute peaks, and data expires after 30 days. Windows incident markers depend on the evidence and retention already available in the local Event Logs and are not equivalent to continuous historical sampling.
 
-Virtual-desktop pinning uses the Windows shell's own internal pinning service—the same behavior exposed as **Show this window on all desktops**. Microsoft does not publish that interface as a stable desktop API, so Memory Bloom treats pinning as best-effort and safely continues on one desktop if a future Windows update changes it.
+Virtual-desktop pinning uses the Windows shell's own internal pinning service—the same behavior exposed as **Show this window on all desktops**. Memory Bloom pins both its stable app identity and current view, reasserts the pin after every reveal, and verifies it periodically while visible. Microsoft does not publish that interface as a stable desktop API, so Bloom still safely continues on one desktop if a future Windows update changes it.
 
 The public changelog is in [CHANGELOG.md](CHANGELOG.md). The exhaustive engineering audit—including reported bugs, implementation challenges, decisions, limitations, and every retained screenshot—is kept separately in [docs/HISTORY.md](docs/HISTORY.md).

@@ -4,6 +4,12 @@ Concise user-visible release notes. The engineering audit is kept separately in 
 
 Dates for early releases are reconstructed from the conversation and build artifacts because Git tracking began after initial development.
 
+## 0.19.0 — 2026-11-07
+
+- Restored reliable visibility across Windows virtual desktops by rechecking the shell pin after every reveal and every 30 seconds while Bloom is visible.
+- Pinned both Memory Bloom's stable app identity and its current window view, making the behavior resilient to hide/show cycles, view churn, and Explorer losing transient shell state.
+- Added a reusable virtual-desktop pin diagnostic and verified automatic recovery after deliberately removing both pins.
+
 ## 0.18.0 — 2026-10-29
 
 - Changed `Ctrl+Alt+B` into a compact visibility-policy toggle between **Always visible** and **Threshold controlled**; it no longer opens the full investigator.

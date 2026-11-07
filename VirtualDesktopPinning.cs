@@ -7,10 +7,11 @@ namespace MemoryBloom;
 // The call is best-effort because Microsoft does not publish this interface as a stable desktop API.
 internal static class VirtualDesktopPinning
 {
+    internal const string AppUserModelId = "MemoryBloom.App";
     private static readonly Guid ImmersiveShellClass = new("C2F03A33-21F5-47FA-B4BB-156362A2F239");
     private static readonly Guid PinnedAppsService = new("B5A399E7-1C87-46B8-88E9-FC5747B171BD");
 
-    public static bool TryPinWindow(IntPtr window, out string? error)
+    public static bool TryEnsureWindowPinned(IntPtr window, out string? error)
     {
         error = null;
         object? shellObject = null;
@@ -34,6 +35,15 @@ internal static class VirtualDesktopPinning
             var pinnedService = PinnedAppsService;
             pinnedObject = shell.QueryService(ref pinnedService, ref pinnedInterface);
             var pinned = (IVirtualDesktopPinnedApps)pinnedObject;
+            try
+            {
+                if (!pinned.IsAppIdPinned(AppUserModelId)) pinned.PinAppID(AppUserModelId);
+            }
+            catch
+            {
+                // View pinning is the authoritative fallback on shell versions that
+                // do not accept an explicit AppUserModelID through this internal API.
+            }
             if (!pinned.IsViewPinned(view)) pinned.PinView(view);
             return pinned.IsViewPinned(view);
         }

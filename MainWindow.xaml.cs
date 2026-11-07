@@ -110,6 +110,8 @@ public partial class MainWindow : Window
     private int _firefoxBrowserPid;
     private double _restingOpacity = 0.98;
     private bool _virtualDesktopPinned;
+    private bool _virtualDesktopPinCheckRunning;
+    private DateTime _lastVirtualDesktopPinCheckUtc = DateTime.MinValue;
     private bool _tabsSectionExpanded;
     private bool _firefoxContentExpanded;
     private MemoryReading? _reading;
@@ -195,7 +197,7 @@ public partial class MainWindow : Window
         {
             RegisterShortcut();
             ApplyNativeWindowShape();
-            await TryPinToAllDesktopsAsync();
+            await EnsurePinnedToAllDesktopsAsync(force: true);
         };
         SizeChanged += (_, _) => ApplyNativeWindowShape();
         StateChanged += (_, _) => ApplyNativeWindowShape();
@@ -241,6 +243,7 @@ public partial class MainWindow : Window
                 _ = RefreshHistoryContextAsync();
             if (_detailed && _expandedPage == ExpandedPage.History) UpdateHistoryView();
             EvaluateVisibility(_reading.PressurePercent);
+            if (IsVisible) _ = EnsurePinnedToAllDesktopsAsync();
             _tick++;
             if (_detailed && _expandedPage == ExpandedPage.Processes && (_tick % 3 == 0 || ProcessTree.Items.Count == 0))
                 await RefreshProcessesAsync();
@@ -284,6 +287,7 @@ public partial class MainWindow : Window
                 SetMinimalSize();
                 PositionAtEdgeIfNeeded();
                 Show();
+                _ = EnsurePinnedToAllDesktopsAsync(force: true);
             }
             return;
         }
@@ -298,6 +302,7 @@ public partial class MainWindow : Window
                 SetMinimalSize();
                 PositionAtEdgeIfNeeded();
                 Show();
+                _ = EnsurePinnedToAllDesktopsAsync(force: true);
             }
         }
         else if (pressure < _settings.HideBelowPercent)
@@ -1042,6 +1047,7 @@ public partial class MainWindow : Window
         Opacity = IsMouseOver ? 1 : _restingOpacity;
         ShowActivated = activate;
         Show();
+        _ = EnsurePinnedToAllDesktopsAsync(force: true);
         if (activate) Activate();
         ShowActivated = true;
         Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(ApplyNativeWindowShape));
@@ -1151,6 +1157,7 @@ public partial class MainWindow : Window
             PositionAtEdgeIfNeeded();
         }
         Show();
+        _ = EnsurePinnedToAllDesktopsAsync(force: true);
         Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(ApplyNativeWindowShape));
         if (_reading is not null) UpdateMemoryVisuals(_reading);
     }
@@ -1304,6 +1311,7 @@ public partial class MainWindow : Window
             SetMinimalSize();
             PositionAtEdgeIfNeeded();
             Show();
+            _ = EnsurePinnedToAllDesktopsAsync(force: true);
         }
         if (!_detailed && UseOrbCompact) SetOrbExpanded(true);
         UpdateVisibilityModeUi();
@@ -1623,14 +1631,27 @@ public partial class MainWindow : Window
         if (SetWindowRgn(window, region, true) == 0) DeleteObject(region);
     }
 
-    private async Task TryPinToAllDesktopsAsync()
+    private async Task EnsurePinnedToAllDesktopsAsync(bool force = false)
     {
-        if (_virtualDesktopPinned) return;
+        if (_previewMode || _virtualDesktopPinCheckRunning) return;
+        if (!force && DateTime.UtcNow - _lastVirtualDesktopPinCheckUtc < TimeSpan.FromSeconds(30)) return;
         var handle = new WindowInteropHelper(this).Handle;
-        for (var attempt = 0; attempt < 3 && !_virtualDesktopPinned; attempt++)
+        if (handle == IntPtr.Zero || !IsWindow(handle)) return;
+
+        _virtualDesktopPinCheckRunning = true;
+        try
         {
-            if (attempt > 0) await Task.Delay(350);
-            _virtualDesktopPinned = VirtualDesktopPinning.TryPinWindow(handle, out _);
+            _virtualDesktopPinned = false;
+            for (var attempt = 0; attempt < 3 && !_virtualDesktopPinned; attempt++)
+            {
+                if (attempt > 0) await Task.Delay(350);
+                _virtualDesktopPinned = VirtualDesktopPinning.TryEnsureWindowPinned(handle, out _);
+            }
+        }
+        finally
+        {
+            _lastVirtualDesktopPinCheckUtc = DateTime.UtcNow;
+            _virtualDesktopPinCheckRunning = false;
         }
     }
 
